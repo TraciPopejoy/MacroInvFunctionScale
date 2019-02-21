@@ -7,7 +7,7 @@ TreatENC<-read_excel("../FEn17/FEn17_data/FEn17OKTreatments.xlsx")
 MusselData<-read_csv("../FEn17/FEn17_data/MusselBMExpFEn17OK.csv")
 names(MusselData)[1]<-"Enclosure"
 #calculate shell surface area by enclosure & species
-MDat<-MusselData %>% full_join(Treat)%>% 
+MDat<-MusselData %>% full_join(TreatENC)%>% 
   select(Enc2,Genus, TreatA, Type,Spp,L, H,W) %>% 
   mutate(ShellSpecies=recode(Genus, "AMBL"="AMB", "ACT"="ACT"),
          ShellSurArea.mm2=2*(L*H)+2*(L*W)+2*(H*W),
@@ -28,7 +28,7 @@ SCounts<-SInv %>% group_by(Enc2, ShellSpecies) %>%
   summarize(Nsam=n(),
             richness=length(unique(Taxa)))%>%
   mutate(SamID=paste(Enc2,ShellSpecies, sep="."))%>% full_join(MDat) %>%
-  mutate(InvertDensity.npcm2=Nsam/TShellSurArea.cm2) %>% full_join(Treat)
+  mutate(InvertDensity.npcm2=Nsam/TShellSurArea.cm2) %>% full_join(TreatENC)
 #long data frame of Enc, Sp, Taxa, Count
 ShellComMat<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>% 
   mutate(SamID=paste(Enc2,ShellSpecies, sep=".")) %>% summarize(N=n()) %>%
@@ -44,11 +44,14 @@ ShellComMat<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>%
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 match(names(ShellComMat[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table
 
+
 #so we have a species community matrix ShellComMat
 #need a trait table of those species
 ShellTraits<-FTaxaTable[match(names(ShellComMat[,-1]), FTaxaTable$Taxa),]
 ShellTraits$Taxa==names(ShellComMat[,-1]) #need it to all be true
-
+ShellTraits <- ShellTraits %>%
+  filter(T.TropP!=0) %>%
+  select(Taxa,T.Habit, T.TropP, T.TropS)
 
 
 #### nmds ####

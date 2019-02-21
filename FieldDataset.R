@@ -7,7 +7,7 @@ Count2016<-read_excel("2016 Field Data.xlsx", sheet = "Counts") %>%
   group_by(Sample, Location, Site, Treatment, Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, sum, na.rm=T)
 
-Count2016$totalinverts<-rowSums(Count2016[,7:63], na.rm=T)
+Count2016$InvDensity.npm2<-rowSums(Count2016[,7:63], na.rm=T)/0.092903
 Count2016[is.na(Count2016)]<-0
 Count2016$richness<-specnumber(Count2016[,7:63])
 
@@ -40,6 +40,9 @@ match(names(FieldComMat[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa 
 #need a trait table of those species
 FieldTraits<-FTaxaTable[match(names(FieldComMat[,-1]), FTaxaTable$Taxa),]
 FieldTraits$Taxa==names(FieldComMat[,-1]) #need it to all be true
+FieldTraits <- FieldTraits %>%
+  filter(T.TropP!=0) %>%
+  select(Taxa,T.Habit, T.TropP, T.TropS)
   
 ########## OLD CODE #########
 #############     Field Invert Biomass Calculation     #############
