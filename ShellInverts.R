@@ -40,6 +40,19 @@ ShellComMat<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>%
   summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
   select(-id)
 
+##need proportional abundance
+ShellPCom<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>% 
+  filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
+         Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Orthoptera") %>% 
+  summarize(N=n()) %>%  mutate(id=1:n(),
+                               SamID=paste(Enc2,ShellSpecies, sep=".")) %>% 
+  spread(Taxa,N) %>% group_by(SamID)%>%
+  summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
+  select(-id) %>% replace(is.na(.),0) %>%
+  mutate(rowsum=rowSums(.[,-1])) %>% ungroup()%>% group_by(SamID)%>%
+  summarise_if(is.numeric,funs(./rowsum)) %>%
+  select(-rowsum) %>% 
+  select(SamID, everything())
 
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 match(names(ShellComMat[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table

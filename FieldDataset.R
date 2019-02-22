@@ -29,17 +29,31 @@ FieldComMat<-Count2016 %>% group_by(Reach, SamplingSeason) %>%
   summarize_if(is.numeric, mean) %>% group_by(Reach, SamplingSeason) %>%
   summarise_if(is.numeric, funs(./0.092903)) %>%
   mutate(FSamID=paste(Reach, SamplingSeason, sep=".")) %>% ungroup()%>%
-  select(-Reach, -SamplingSeason, -Other.other, -totalinverts, -richness) %>%
+  select(-Reach, -SamplingSeason, -Other.other, -richness) %>%
   select(FSamID, everything())
 #need to check if this is an appropriate way to reduce the amount of samples
 
+FieldPCom<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
+  summarize_if(is.numeric, mean) %>%
+  mutate(FSamID=paste(Reach, SamplingSeason, sep="."))%>% ungroup()%>%
+  select(-InvDensity.npm2,-Other.other,-Tri.Pupa, -richness,-SamplingSeason,-Reach) %>%
+  gather(Taxa,Count, -FSamID) %>% group_by(FSamID, Taxa) %>% 
+  filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
+         Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Dip.Cyclorrhaphous",
+         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae") %>%
+  mutate(id=1:n()) %>% 
+  spread(Taxa,Count) %>%  select(-id) %>% ungroup() %>%
+  mutate(rowsum=rowSums(.[,-1])) %>% group_by(FSamID) %>%
+  summarise_if(is.numeric,funs(./rowsum))%>%
+  select(-rowsum) %>%  select(FSamID, everything())
+
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
-match(names(FieldComMat[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table
+match(names(FieldPCom[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table
 
 #so we have a species community matrix ShellComMat
 #need a trait table of those species
-FieldTraits<-FTaxaTable[match(names(FieldComMat[,-1]), FTaxaTable$Taxa),]
-FieldTraits$Taxa==names(FieldComMat[,-1]) #need it to all be true
+FieldTraits<-FTaxaTable[match(names(FieldPCom[,-1]), FTaxaTable$Taxa),]
+FieldTraits$Taxa==names(FieldPCom[,-1]) #need it to all be true
 FieldTraits <- FieldTraits %>%
   filter(T.TropP!=0) %>%
   select(Taxa,T.Habit, T.TropP, T.TropS)

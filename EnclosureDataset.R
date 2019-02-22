@@ -44,10 +44,23 @@ EnclComMat<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   summarize(N=n()) %>%
   left_join(ECounts) %>% mutate(IndDensity.m2=N/AreaSamp)%>%
   select(Enc, Week,TEid, Taxa, IndDensity.m2) %>% 
-  mutate(id=1:n()) %>% 
+  mutate(id=1:n()) %>% filter(Taxa!="MYSTERY") %>%
   spread(Taxa,IndDensity.m2) %>% group_by(TEid) %>%
   summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
-  select(-id)
+  select(-id) 
+
+#need to make it proportional abundance
+EnclPCom<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>% 
+  filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
+         Taxa!="Tri.Pupa") %>% 
+  summarize(N=n()) %>%  mutate(id=1:n()) %>% 
+  spread(Taxa,N) %>% group_by(TEid)%>%
+  summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
+  select(-id) %>% replace(is.na(.),0) %>%
+  mutate(rowsum=rowSums(.[,-1])) %>% group_by(TEid) %>%
+  summarise_if(is.numeric,funs(./rowsum)) %>%
+  select(-rowsum) %>%
+  select(TEid, everything())
 
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 match(names(EnclComMat[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table
