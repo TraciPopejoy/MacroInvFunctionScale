@@ -22,7 +22,7 @@ meanCount2016<- Count2016 %>% group_by(Reach,SamplingSeason) %>%
 nrow(meanCount2016) #28 because 4 samples (2 seasons for 2 reach) for 7 sites
 
 fieldSiteKey<-Count2016 %>% group_by(Sample, Reach, SamplingSeason, Treatment) %>% 
-  tally() %>% select(-n)
+  tally() %>% select(-n) %>% mutate(FSamID=paste(Reach,SamplingSeason, sep="."))
 surbernum<-fieldSiteKey %>% group_by(Reach, SamplingSeason) %>% tally()
 
 FieldComMat<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
@@ -56,8 +56,35 @@ FieldTraits<-FTaxaTable[match(names(FieldPCom[,-1]), FTaxaTable$Taxa),]
 FieldTraits$Taxa==names(FieldPCom[,-1]) #need it to all be true
 FieldTraits <- FieldTraits %>%
   filter(T.TropP!=0) %>%
-  select(Taxa,T.Habit, T.TropP, T.TropS)
-  
+  select(Taxa,T.Habit, T.TropP, T.TropS,
+         T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
+
+FieldPComSUR<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
+  #mutate(FSamID=paste(Reach, SamplingSeason, sep="."))%>% 
+  ungroup()%>%
+  select(-InvDensity.npm2,-Other.other,-Tri.Pupa, -richness,-SamplingSeason,-Reach,
+         -Location,-Site,-Treatment)%>%
+  gather(Taxa,Count, -Sample) %>% 
+  filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
+         Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Dip.Cyclorrhaphous",
+         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae")%>%
+  mutate(id=1:n()) %>%  spread(Taxa,Count) %>% group_by(Sample) %>%
+  summarise_all(funs(mean(.[which(!is.na(.))]))) %>% select(-id) %>% ungroup()%>%
+  mutate(rowsum=rowSums(.[,-1])) %>% group_by(Sample) %>%
+  summarise_if(is.numeric,funs(./rowsum))%>%
+  select(-rowsum) %>%  select(Sample, everything()) %>%
+  filter(Sample!="KT-MR Oct16 S1")
+
+#### mussel biomass estimate ####
+FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%  
+  group_by(Site) %>%
+  summarize(Mussel.bm.g=sum(sppsp_ols_mass..g.),
+            Quadrat.n=max(Quadrat)) %>%
+  mutate(Mussel.g.m2=Mussel.bm.g/(Quadrat.n*0.25),
+         Treatment=case_when(substr(Site, 3,4)=="NM"~"NM",
+                             T~"MR"),
+         Reach=paste(substr(Site,1,2),Treatment, sep="-"))
+
 ########## OLD CODE #########
 #############     Field Invert Biomass Calculation     #############
 BiomassReg<-read_excel("Macroinv Power Law Coeffs TBP.xlsx", sheet = 1)
