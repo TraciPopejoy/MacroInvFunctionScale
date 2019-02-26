@@ -64,7 +64,8 @@ ShellTraits<-FTaxaTable[match(names(ShellComMat[,-1]), FTaxaTable$Taxa),]
 ShellTraits$Taxa==names(ShellComMat[,-1]) #need it to all be true
 ShellTraits <- ShellTraits %>%
   filter(T.TropP!=0) %>%
-  select(Taxa,T.Habit, T.TropP, T.TropS)
+  select(Taxa,T.Habit, T.TropP, T.TropS,
+         T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
 
 
 #### nmds ####
@@ -125,3 +126,12 @@ ggplot() +
         panel.grid.major = element_blank(),  #remove major-grid labels
         panel.grid.minor = element_blank(),  #remove minor-grid labels
         plot.background = element_blank())
+
+##### biomass #####
+MusBioShell<-MusselData %>% left_join(TreatENC) %>%
+  mutate(BiomassE=case_when(Genus=="AMB"~ 1.57e-6*L^3.21,
+                            Genus=='ACT'~ 4.7e-7*L^3.51)) %>%
+  group_by(Enc2, Genus, Treatment) %>%
+  summarize(sumBM=sum(BiomassE, na.rm=T), 
+            meanBM=mean(BiomassE,na.rm=T), 
+            sdBM=sd(BiomassE, na.rm=T))
