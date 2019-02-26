@@ -282,3 +282,30 @@ library(cowplot)
 plot_grid(sdens,edenss,fdens, ncol=3,labels = "AUTO")
 ggsave("InvertDensity.tiff", dpi=600, width = 10, height = 3.5, units="in")
 
+#### discharge investigation ####
+head(FSitesAlpha)
+FieldDischarge<-read_excel("DischargeField.xlsx") %>% 
+  group_by(Reach, SamplingSeason) %>%
+  summarize(Discharge.cms=mean(`Discharge (M3/s)`, na.rm=T))
+FSitesDis<-left_join(FSitesAlpha,FieldDischarge)
+ggplot(FSitesDis,
+       aes(x=Discharge.cms, y=qDTM, color=Treatment.x, shape=SamplingSeason))+
+  geom_point()
+summary(lm(qDTM~Discharge.cms, data=FSitesDis))
+
+EncDVw09<-read.csv("../FEn17//FEn17_data/EncPhysDisFEn17OK.csv") %>% 
+  rename(Enclosure=`ï..Enclosure`) %>% left_join(TreatENC) %>%
+  mutate(Discharge.cms=0.25*V.mps*Depth.m,
+         Week="w09") %>%
+  select(Enc2,Week,Discharge.cms)
+EncDVw12<-read_excel("../FEn17/FEn17_data/videowithabiotics.xlsx") %>% 
+  left_join(TreatENC, by=c("Unit"="Enclosure")) %>%
+  mutate(Discharge.cms=0.25*Velocity*Depth,
+         Week="w12") %>% filter(Month=="Oct") %>%
+  select(Enc2,Week,Discharge.cms)
+EncSitesDis<-rbind(EncDVw09,EncDVw12) %>% right_join(EnSitesAlpha)
+ggplot(EncSitesDis,
+       aes(x=Discharge.cms, y=qDTM, color=Treatment, shape=Week))+
+  geom_point()
+summary(lm(qDTM~Discharge.cms, data=EncSitesDis))
+summary(lm(qDTM~MusselDens.g.m2*Discharge.cms, data=EncSitesDis))
