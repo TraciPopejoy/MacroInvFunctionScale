@@ -6,26 +6,21 @@ Count2016<-read_excel("2016 Field Data.xlsx", sheet = "Counts") %>%
   mutate(Reach=paste(Site, Treatment, sep="-")) %>% 
   group_by(Sample, Location, Site, Treatment, Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, sum, na.rm=T)
+Count2015<-read_excel("2015 Data Hotspot Field Surber.xlsx") %>% 
+  mutate(Reach=paste(Site, Treatment, sep="-")) %>%
+  group_by(Sample, Reach, Treatment, SamplingSeason, Site, Location) %>%
+  summarize_if(is.numeric, sum, na.rm=T)
+CountField<-rbind(Count2016, Count2015)
 
-Count2016$InvDensity.npm2<-rowSums(Count2016[,7:63], na.rm=T)/0.092903
-Count2016[is.na(Count2016)]<-0
-Count2016$richness<-specnumber(Count2016[,7:63])
+CountField$InvDensity.npm2<-rowSums(CountField[,7:68], na.rm=T)/0.092903
+CountField[is.na(CountField)]<-0
+CountField$richness<-specnumber(CountField[,7:68])
 
-meanCount2016<- Count2016 %>% group_by(Reach,SamplingSeason) %>% 
-  select(-Sample,-Location,-Site,-Treatment) %>%
-  summarise_all(funs(mean(.[which(!is.na(.))]))) %>%
-  mutate(Treatment=substr(Reach, 4,5),
-         Site=substr(Reach, 1,2),
-         River=case_when(substr(Site,1,1)=="K" ~ "Kiamichi",
-                         substr(Site,1,1)=="L" ~ "Little",
-                         substr(Site,1,1)=="G" ~ "Glover"))
-nrow(meanCount2016) #28 because 4 samples (2 seasons for 2 reach) for 7 sites
-
-fieldSiteKey<-Count2016 %>% group_by(Sample, Reach, SamplingSeason, Treatment) %>% 
+fieldSiteKey<-CountField %>% group_by(Sample, Reach, SamplingSeason, Treatment) %>% 
   tally() %>% select(-n) %>% mutate(FSamID=paste(Reach,SamplingSeason, sep="."))
 surbernum<-fieldSiteKey %>% group_by(Reach, SamplingSeason) %>% tally()
 
-FieldComMat<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
+FieldComMat<-CountField %>% group_by(Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, mean) %>% group_by(Reach, SamplingSeason) %>%
   summarise_if(is.numeric, funs(./0.092903)) %>%
   mutate(FSamID=paste(Reach, SamplingSeason, sep=".")) %>% ungroup()%>%
@@ -33,14 +28,15 @@ FieldComMat<-Count2016 %>% group_by(Reach, SamplingSeason) %>%
   select(FSamID, everything())
 #need to check if this is an appropriate way to reduce the amount of samples
 
-FieldPCom<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
+FieldPCom<-CountField %>% group_by(Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, mean) %>%
   mutate(FSamID=paste(Reach, SamplingSeason, sep="."))%>% ungroup()%>%
   select(-InvDensity.npm2,-Other.other,-Tri.Pupa, -richness,-SamplingSeason,-Reach) %>%
   gather(Taxa,Count, -FSamID) %>% group_by(FSamID, Taxa) %>% 
   filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
          Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Dip.Cyclorrhaphous",
-         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae") %>%
+         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae",
+         Taxa!="Hymenoptera.miscH") %>%
   mutate(id=1:n()) %>% 
   spread(Taxa,Count) %>%  select(-id) %>% ungroup() %>%
   mutate(rowsum=rowSums(.[,-1])) %>% group_by(FSamID) %>%
@@ -59,7 +55,7 @@ FieldTraits <- FieldTraits %>%
   select(Taxa,T.Habit, T.TropP, T.TropS,
          T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
 
-FieldPComSUR<-Count2016 %>% group_by(Reach, SamplingSeason) %>% 
+FieldPComSUR<-CountField %>% group_by(Reach, SamplingSeason) %>% 
   #mutate(FSamID=paste(Reach, SamplingSeason, sep="."))%>% 
   ungroup()%>%
   select(-InvDensity.npm2,-Other.other,-Tri.Pupa, -richness,-SamplingSeason,-Reach,
@@ -67,7 +63,8 @@ FieldPComSUR<-Count2016 %>% group_by(Reach, SamplingSeason) %>%
   gather(Taxa,Count, -Sample) %>% 
   filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
          Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Dip.Cyclorrhaphous",
-         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae")%>%
+         Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae",
+         Taxa!="Hymenoptera.miscH")%>%
   mutate(id=1:n()) %>%  spread(Taxa,Count) %>% group_by(Sample) %>%
   summarise_all(funs(mean(.[which(!is.na(.))]))) %>% select(-id) %>% ungroup()%>%
   mutate(rowsum=rowSums(.[,-1])) %>% group_by(Sample) %>%
