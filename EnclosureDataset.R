@@ -71,4 +71,24 @@ EnclTraits<-FTaxaTable[match(names(EnclComMat[,-1]), FTaxaTable$Taxa),]
 EnclTraits$Taxa==names(EnclComMat[,-1]) #need it to all be true
 EnclTraits <- EnclTraits %>%
   filter(T.TropP!=0) %>%
-  select(Taxa,T.Habit, T.TropP, T.TropS)
+  select(Taxa,T.Habit, T.TropP, T.TropS,
+         T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
+
+
+#### biomass data ####
+mreg<-read_excel("../FEn17/FEn17_data/LENGTH-MASS_CLA_CCV_20161208-reg coefficients.xlsx",
+                 sheet=2)
+MusselData %>% left_join(TreatENC) %>%
+  mutate(BiomassE=case_when(Genus=="AMB"~ 1.57e-6*L^3.21,
+                            Genus=='ACT'~ 4.7e-7*L^3.51))%>%
+  group_by(Genus) %>%
+  summarize(meanBM=mean(BiomassE, na.rm=T))
+MusBiomass<-MusselData %>% left_join(TreatENC) %>%
+  mutate(BiomassE=case_when(Notes=="NotRecovered"&Genus=="AMB"~3.47,
+                            Notes=="NotRecovered"&Genus=="ACT"~7.64,
+                            Genus=="AMB"~ 1.57e-6*L^3.21,
+                            Genus=='ACT'~ 4.7e-7*L^3.51)) %>%
+  group_by(Enc2, Treatment) %>%
+  summarize(sumBM=sum(BiomassE, na.rm=T), 
+            meanBM=mean(BiomassE,na.rm=T), 
+            sdBM=sd(BiomassE, na.rm=T))
