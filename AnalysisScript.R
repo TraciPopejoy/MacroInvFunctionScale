@@ -54,23 +54,25 @@ ggplot(FSitesAlphaSUR, aes(x=SamplingSeason, y=M, fill=Treatment))+
 #aggregated surber samples
 FAlphaF<-FTD.comm(as.matrix(FTdist), as.matrix(FieldPCom[,-1]))
 FSitesAlpha<-cbind(FAlphaF[[1]], FieldPCom[,1]) %>% left_join(fieldSiteKey[,-1])%>%
-  filter(!duplicated(.)) %>% left_join(FieldBMest, by="Reach")
-ggplot(FSitesAlpha, aes(x=Mussel.g.m2, y=qDTM, color=SamplingSeason))+
+  filter(!duplicated(.)) %>% left_join(FieldBMest, by="Reach") %>%
+  mutate(SamSeaF=factor(SamplingSeason, 
+                        levels=c("Summer2015", "Fall2015", "Summer2016", "Fall2016")))
+ggplot(FSitesAlpha, aes(x=Mussel.g.m2, y=qDTM, color=SamSeaF))+
   geom_point()+
   ylab("qDTM\nintegrates Fn diversity & dispersion")+
   geom_smooth(aes(group=SamplingSeason), method="lm", level=0, color="black")+
-  facet_wrap(~SamplingSeason)+theme_bw()
+  facet_wrap(~SamSeaF)+theme_bw()
 summary(lm(qDTM~Mussel.g.m2+SamplingSeason, data=FSitesAlpha))
-ggplot(FSitesAlpha, aes(x=SamplingSeason, y=qDTM, fill=Treatment))+
-  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment)))+
+ggplot(FSitesAlpha, aes(x=SamplingSeason, y=qDTM, fill=Treatment.x))+
+  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment.x)))+
   ylab("qDTM\nintegrates Fn diversity & dispersion")+
   theme(legend.direction="horizontal",legend.position = "bottom")
-ggplot(FSitesAlpha, aes(x=SamplingSeason, y=qDT, fill=Treatment))+
-  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment)))+
+ggplot(FSitesAlpha, aes(x=SamplingSeason, y=qDT, fill=Treatment.x))+
+  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment.x)))+
   ylab("qDT - Functional Species Diversity")+
   theme(legend.direction="horizontal",legend.position = "bottom")
-ggplot(FSitesAlpha, aes(x=SamplingSeason, y=M, fill=Treatment))+
-  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment)))+
+ggplot(FSitesAlpha, aes(x=SamplingSeason, y=M, fill=Treatment.x))+
+  geom_boxplot(aes(group=interaction(SamplingSeason,Treatment.x)))+
   ylab("M - magnitude of functional dispersion")+
   theme(legend.direction="horizontal",legend.position = "bottom")
 
@@ -275,8 +277,7 @@ sdens<-ggplot(SCounts, aes(x=TreatA, y=InvertDensity.npcm2/0.0001, fill=ShID))+
                     labels=c("Live ACT", "Sham ACT","Live AMB","Sham AMB"))+
   scale_y_continuous(name=expression("Macroinvertebrates per m " ^ -2))+
   scale_x_discrete(name="Enclosure Treatment")+
-  theme(legend.justification=c(1,1),legend.position = c(1,1))
-,
+  theme(legend.justification=c(1,1),legend.position = c(1,1)),
         legend.direction="horizontal")+guides(fill=guide_legend(nrow=2))
 library(cowplot)
 plot_grid(sdens,edenss,fdens, ncol=3,labels = "AUTO")
@@ -291,7 +292,7 @@ FSitesDis<-left_join(FSitesAlpha,FieldDischarge)
 ggplot(FSitesDis,
        aes(x=Discharge.cms, y=qDTM, color=Treatment.x, shape=SamplingSeason))+
   geom_point()
-summary(lm(qDTM~Discharge.cms, data=FSitesDis))
+summary(lm(qDTM~Mussel.g.m2*Discharge.cms, data=FSitesDis))
 
 EncDVw09<-read.csv("../FEn17//FEn17_data/EncPhysDisFEn17OK.csv") %>% 
   rename(Enclosure=`ï..Enclosure`) %>% left_join(TreatENC) %>%
@@ -305,7 +306,19 @@ EncDVw12<-read_excel("../FEn17/FEn17_data/videowithabiotics.xlsx") %>%
   select(Enc2,Week,Discharge.cms)
 EncSitesDis<-rbind(EncDVw09,EncDVw12) %>% right_join(EnSitesAlpha)
 ggplot(EncSitesDis,
-       aes(x=Discharge.cms, y=qDTM, color=Treatment, shape=Week))+
-  geom_point()
+       aes(x=Discharge.cms, y=qDTM, color=TreatA, shape=Week))+
+  geom_point(size=2)
 summary(lm(qDTM~Discharge.cms, data=EncSitesDis))
 summary(lm(qDTM~MusselDens.g.m2*Discharge.cms, data=EncSitesDis))
+
+#### debugging code ####
+for(k in 1:nrow(FieldPCom)){
+  td<-FTaxaTable[match(names(FieldPCom[k,-1]), FTaxaTable$Taxa),] %>%
+    filter(T.TropP!=0) %>%
+    select(Taxa,T.Habit, T.TropP, T.TropS,
+           T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
+  tdmat<-dist(td[,-1])/max(dist(td[,-1]))
+  spmat<-FieldPCom[k,-1]
+  testk<-FTD.comm(as.matrix(tdmat), as.matrix(spmat[,-1]))
+  print(k)
+}

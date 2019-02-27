@@ -36,7 +36,7 @@ FieldPCom<-CountField %>% group_by(Reach, SamplingSeason) %>%
   filter(Taxa!="MYSTERY", Taxa!="MysteryTricoptera", Taxa!="Col.Myst",
          Taxa!="Tri.Pupa", Taxa!="Dip.Adult", Taxa!="Dip.Cyclorrhaphous",
          Taxa!="Dip.Other", Taxa!="Dip.Orthorrhaphous", Taxa!="Dip.Thaumaleidae",
-         Taxa!="Hymenoptera.miscH") %>%
+         Taxa!="Hymenoptera.miscH", Taxa!="Dip.Ascillidae") %>%
   mutate(id=1:n()) %>% 
   spread(Taxa,Count) %>%  select(-id) %>% ungroup() %>%
   mutate(rowsum=rowSums(.[,-1])) %>% group_by(FSamID) %>%
@@ -44,7 +44,7 @@ FieldPCom<-CountField %>% group_by(Reach, SamplingSeason) %>%
   select(-rowsum) %>%  select(FSamID, everything())
 
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
-match(names(FieldPCom[,-1]), FTaxaTable$Taxa) #checking to make sure all taxa in taxa table
+length(match(names(FieldPCom[,-1]), FTaxaTable$Taxa)) #checking to make sure all taxa in taxa table
 
 #so we have a species community matrix ShellComMat
 #need a trait table of those species
