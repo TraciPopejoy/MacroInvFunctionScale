@@ -1,5 +1,4 @@
 #### Invertebrates on Shells ####
-
 library(readxl);library(tidyverse)
 #bring in treatment data from enclosures
 TreatENC<-read_excel("../FEn17/FEn17_data/FEn17OKTreatments.xlsx") 
@@ -67,6 +66,63 @@ ShellTraits <- ShellTraits %>%
   select(Taxa,T.Habit, T.TropP, T.TropS,
          T.dev,T.Lifespan,T.crwl,T.swim,T.MatSize)
 
+
+#### exploring family abundance ####
+head(ShellComMat)
+View(ShellPCom %>%
+       gather(Taxa, Abundance, -SamID) %>% group_by(Taxa) %>%
+       summarize(mean.A=mean(Abundance, na.rm=T)*100))
+
+View(ShellComMat %>%
+       gather(Taxa, Abundance, -SamID) %>% group_by(Taxa) %>%
+       summarize(mean.A=mean(Abundance, na.rm=T), sum.A=sum(Abundance, na.rm=T)))
+
+ShellGraph<-ShellComMat %>% 
+  mutate(Enc2=substr(SamID, 1,3), Genus=substr(SamID, 5,7)) %>%
+  left_join(TreatENC) %>% left_join(MusBioShell) %>%
+  mutate(MusselBiomass.g.m2=sumBM/.25,
+         Treat.Shell=paste(Type,Genus, sep="."))
+
+#ChironomidaeL - FFG minx
+ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Dip.ChironomidaeL))+
+  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+#Polycentropidae - Predator
+ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Tri.Polycentropidae))+
+  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+#Heptageniidae
+ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Eph.Heptageniidae))+
+  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+#Elmidae larvae
+ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Col.ElmL))+
+  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+
+ggplot(ShellGraph, aes(x=log1p(Dip.ChironomidaeL)))+geom_histogram()
+ggplot(ShellGraph, aes(x=log1p(Tri.Polycentropidae)))+geom_histogram()
+
+log1p.ShellCom<-ShellComMat %>% #taxa >0.1%
+  select(-SamID) %>% replace(is.na(.),0) %>%
+  mutate_if(is.numeric, .funs=log1p)
+shell.pca<-prcomp(log1p.ShellCom)
+plot(shell.pca, type="l")
+summary(shell.pca)
+print(shell.pca)
+
+ShellGraph<-ShellGraph %>% mutate(PCA1=shell.pca$x[,1],
+                                  PCA2=shell.pca$x[,2])
+ggplot(ShellGraph, aes(x=PCA1, y=PCA2))+
+  geom_point(aes(color=Treat.Shell))+
+  scale_color_futurama()
+ggplot(ShellGraph, aes(x=MusselBiomass.g.m2, y=PCA2))+
+  geom_point(aes(color=Type))+geom_smooth(method="lm")
+summary(lm(PCA1~MusselBiomass.g.m2*Type, data=ShellGraph))
+PCAline<-data.frame(species=rownames(shell.pca$rotation),Scores=shell.pca$rotation[,2])
+ggplot(PCAline)+
+  geom_text(aes(-1,Scores,label=round(Scores,3)))+
+  geom_text(aes(1,Scores, label=species))+
+  geom_vline(xintercept=0)+
+  scale_y_continuous(trans="log")+
+  coord_cartesian(xlim=c(-3,3))+
+  labs(x=NULL,y=NULL)+theme_classic()
 
 #### nmds ####
 head(SCountsT)
