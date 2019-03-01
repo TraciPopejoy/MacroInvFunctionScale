@@ -1,5 +1,4 @@
 #### Invertebrates on at Enclosure Level ####
-
 library(readxl);library(tidyverse)
 #bring in treatment data from enclosures
 TreatENC<-read_excel("../FEn17/FEn17_data/FEn17OKTreatments.xlsx") 
@@ -39,6 +38,14 @@ ECounts<-EnclInv %>% group_by(TEid, Enc, Week) %>%
          InvertDensity.npm2=Nsam/AreaSamp) %>% 
   full_join(TreatENC) %>% 
   select(-Enclosure, -Enc2, -Basket., -WeekG)
+View(ECounts %>% group_by(Type, TreatA) %>% summarize_if(is.numeric, mean))
+View(ECounts %>% group_by(Week) %>% summarize_if(is.numeric, mean))
+ECounts <-ECounts %>% 
+  mutate(Enc2=substr(TEid, 4,6), Week=substr(TEid, 1,3)) %>%
+  left_join(MusBiomass) %>% replace(is.na(.),0) %>%
+  mutate(MusselBiomass.g.m2=sumBM/0.25)
+summary(lmer(InvertDensity.npm2~MusselBiomass.g.m2+Week+(1|Enc2), data=ECounts))
+
 #long data frame of Enc, Sp, Taxa, Count
 EnclComMat<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>% 
   summarize(N=n()) %>%
@@ -92,3 +99,68 @@ MusBiomass<-MusselData %>% left_join(TreatENC) %>%
   summarize(sumBM=sum(BiomassE, na.rm=T), 
             meanBM=mean(BiomassE,na.rm=T), 
             sdBM=sd(BiomassE, na.rm=T))
+
+#### exploring family abundance ####
+head(EnclComMat)
+View(EnclPCom %>%
+       gather(Taxa, Abundance, -TEid) %>% group_by(Taxa) %>%
+       summarize(mean.A=mean(Abundance, na.rm=T)*100))
+
+View(EnclComMat %>%
+       gather(Taxa, Abundance, -TEid) %>% group_by(Taxa) %>%
+       summarize(mean.A=mean(Abundance, na.rm=T), sum.A=sum(Abundance, na.rm=T)))
+
+EnclGraph<-EnclComMat %>% 
+  mutate(Enc2=substr(TEid, 4,6), Week=substr(TEid, 1,3)) %>%
+  left_join(TreatENC) %>% left_join(MusBiomass) %>%
+  mutate(MusselBiomass.g.m2=sumBM/.25) %>% replace(is.na(.),0)
+
+#Heptageniidae
+ggplot(EnclGraph, aes(x=MusselBiomass.g.m2,y=Eph.Heptageniidae))+
+  geom_point(size=2, aes(color=TreatA))+geom_smooth(method="lm")
+summary(lm(Eph.Heptageniidae~MusselBiomass.g.m2, data=EnclGraph))
+#ChironomidaeL - FFG minx
+ggplot(EnclGraph, aes(x=MusselBiomass.g.m2,y=Dip.ChironomidaeL))+
+  geom_point(size=2, aes(color=TreatA))+geom_smooth(method="lm")
+summary(lm(Dip.ChironomidaeL~MusselBiomass.g.m2, data=EnclGraph))
+#Elmidae larvae
+ggplot(EnclGraph, aes(x=MusselBiomass.g.m2,y=Col.ElmL))+
+  geom_point(size=2, aes(color=TreatA))+geom_smooth(method="lm")
+summary(lm(Col.ElmL~MusselBiomass.g.m2, data=EnclGraph))
+#Polycentropidae
+ggplot(EnclGraph, aes(x=MusselBiomass.g.m2,y=Tri.Polycentropidae))+
+  geom_point(size=2, aes(color=TreatA))+geom_smooth(method="lm")
+summary(lm(Tri.Polycentropidae~MusselBiomass.g.m2, data=EnclGraph))
+
+ggplot(EnclGraph, aes(x=log1p(Dip.ChironomidaeL)))+geom_histogram()
+
+log1p.EnclComMat<-EnclComMat %>% #top 20 taxa
+  select(Eph.Heptageniidae, Dip.ChironomidaeL,Col.ElmL,Tri.Polycentropidae,
+         Od.Damselflies,Eph.Trcorythidae,Eph.Leptophlebiidae, 
+         Dip.ChironomidaeP,Col.Psephenidae,
+         Col.ElmA, Eph.Polymitarcyidae,Gas.Ancylidae,Oligochaeta.misc,
+         Biv.Corbicula,Hydrozoans.miscH,Od.Dragonflies, Megaloptera.miscM,
+         Copepoda.Cyclopoida, Hirudinea.leach, Eph.Myst,-TEid) %>% 
+  replace(is.na(.),0) %>%
+  mutate_if(is.numeric, .funs=log1p)
+encl.pca<-prcomp(log1p.EnclComMat)
+plot(encl.pca, type="l")
+summary(encl.pca)
+print(encl.pca)
+encl.pca$rotation[,2]
+
+EnclGraph<-EnclGraph %>% mutate(PCA1=encl.pca$x[,1],
+                                  PCA2=encl.pca$x[,2])
+ggplot(EnclGraph, aes(x=PCA1, y=PCA2))+
+  geom_point(aes(color=TreatA, shape=Week))+
+  scale_color_futurama()
+ggplot(EnclGraph, aes(x=MusselBiomass.g.m2, y=PCA1))+
+  geom_point(aes(color=TreatA, shape=Week))+geom_smooth(method="lm")
+PCAlineE<-data.frame(species=rownames(encl.pca$rotation),Scores=encl.pca$rotation[,2])
+ggplot(PCAlineE)+
+  geom_text(aes(-1,Scores,label=round(Scores,3)))+
+  geom_text(aes(1,Scores, label=species))+
+  geom_vline(xintercept=0)+
+  scale_y_continuous(trans="log")+
+  coord_cartesian(xlim=c(-3,3))+
+  labs(x=NULL,y=NULL)+theme_classic()
