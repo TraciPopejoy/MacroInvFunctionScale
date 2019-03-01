@@ -145,6 +145,18 @@ ggplot(FieldGraph, aes(x=PCA1, y=PCA2))+
   geom_point(aes(color=Treatment))+
   scale_color_futurama()
 
+### describe invert density ###
+FCounts<-CountField %>% 
+  select(Reach, SamplingSeason, InvDensity.npm2, richness, Treatment) %>%
+  group_by(Reach, SamplingSeason, Treatment) %>%
+  summarize_if(is.numeric, mean, na.rm=T) %>%
+  mutate(SeasF=factor(SamplingSeason, 
+                      levels=c("Summer2015","Fall2015","Summer2016","Fall2016"))) %>%
+  left_join(FieldBMest) %>% replace(is.na(.), 0)
+library(lme4);library(lmerTest)
+summary(lmer(log1p(InvDensity.npm2)~Mussel.g.m2+SeasF+(1|Reach), data=FCounts))
+View(FCounts %>% group_by(Treatment) %>%
+  select(-Reach, -SamplingSeason, -Site) %>%summarize_all(mean))
 
 ########## OLD CODE #########
 #############     Field Invert Biomass Calculation     #############
