@@ -53,7 +53,6 @@ fieldSiteKeyA<-CountField %>% group_by(Sample, Reach, SamplingSeason, Treatment)
   mutate(FSamID=paste(Reach,SamplingSeason, sep="."),
          Season=case_when(substr(SamplingSeason, 1,6)=="Summer"~"Summer",
                           substr(SamplingSeason, 1,6)=="Fall20"~"Fall"))
-fieldSiteKey %>% group_by(Reach, SamplingSeason) %>% tally() #surber number
 # field mussel biomass estimate
 FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%  
   group_by(Site) %>%
@@ -62,8 +61,9 @@ FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%
   mutate(Mussel.g.m2=Mussel.bm.g/(Quadrat.n*0.25),
          Treatment=case_when(substr(Site, 3,4)=="NM"~"NM",
                              T~"MR"),
-         Reach=paste(substr(Site,1,2),Treatment, sep="-"))
+         Reach=paste(substr(Site,1,2),Treatment, sep="-")) 
 fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest)
+#fieldSiteKey %>% group_by(Reach, SamplingSeason) %>% tally() #surber number
 
 #field data community matrix in density; units are n/m2
 F.ComDens<-CountField %>% group_by(Reach, SamplingSeason) %>% 
@@ -72,9 +72,10 @@ F.ComDens<-CountField %>% group_by(Reach, SamplingSeason) %>%
   mutate(FSamID=paste(Reach, SamplingSeason, sep=".")) %>% group_by(FSamID)%>%
   left_join(fieldSiteKey) %>% ungroup() %>% select(-Sample) %>%
   filter(!duplicated(.))%>%
-  select(-Quadrat.n, -Mussel.bm.g, -Site) %>%
+  select(-Quadrat.n, -Mussel.bm.g, -Site,-richness) %>%
   select(FSamID,Reach,SamplingSeason, Treatment,Season,Mussel.g.m2,
-         InvDensity.npm2, richness,everything())
+         InvDensity.npm2,everything()) %>%
+  replace(is.na(.),0)
 # field data community matrix in relative abundance; units are %
 F.ComPer<-CountField %>% group_by(Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, mean) %>%
@@ -272,7 +273,8 @@ ECounts<-EnclInv %>% group_by(TEid, Enc, Week) %>%
   mutate(AreaSamp=(Basket.*.03315),
          InvertDensity.npm2=Nsam/AreaSamp) %>% 
   full_join(TreatENC) %>% 
-  left_join(MusBiomass)
+  left_join(MusBiomass) %>%
+  replace(is.na(.),0)
 
 # enclosure data community matrix in density; units are n/m2
 E.ComDens<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>% 
@@ -354,10 +356,12 @@ S.ComDens<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>%
   mutate(id=1:n()) %>% 
   spread(Taxa,IndDensity.cm2) %>% group_by(SamID)%>%
   summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
+  replace(is.na(.),0)%>%
   left_join(SCounts)%>% 
   select(-id,-Nsam,-richness,-Enclosure,-TShellSurArea.cm2,
          -InvertDensity.npcm2,-TreatF)%>%
-  select(SamID,Enc2,ShellSpecies,TreatA,Type,Spp, everything())
+  mutate(SheType=paste(ShellSpecies,Type))%>%
+  select(SamID,Enc2,ShellSpecies,TreatA,Type,Spp,SheType, everything())
 
 # shell data community matrix in relative abundance; units are %
 S.ComPer<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>% 
