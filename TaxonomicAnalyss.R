@@ -164,3 +164,89 @@ ggplot(S.ComDens, aes(x=SheType,y=Col.ElmL))+
   geom_point(size=2, aes(color=TreatA))+
   scale_color_futurama()
 
+# Fuzzy ordination --------------------
+#
+# Mussel Biomass is already in all of the data sets.
+library(fso)
+# Discharge ===========================
+FieldDischarge<-read_excel("DischargeField.xlsx") %>% 
+  group_by(Reach, SamplingSeason) %>%
+  summarize(Discharge.cms=mean(`Discharge (M3/s)`, na.rm=T))
+####suplementing values find a better way! ###
+#based on F16 data from respective reach (or S16 for L3)
+FieldDischarge["FSamID"=="GL-MR.Fall2015","Discharge.cms"]<-0.120 
+FieldDischarge["FSamID"=="GL-NM.Fall2015","Discharge.cms"]<-0.103 
+FieldDischarge["FSamID"=="KT-MR.Fall2015","Discharge.cms"]<-0.109 
+FieldDischarge["FSamID"=="L3-MR.Summer2015","Discharge.cms"]<-0.819 
+FieldDischarge["FSamID"=="L3-NM.Summer2015","Discharge.cms"]<-0.556 
+
+EncDVw09<-read.csv("../FEn17//FEn17_data/EncPhysDisFEn17OK.csv") %>% 
+  rename(Enclosure=`ï..Enclosure`) %>% left_join(TreatENC) %>%
+  mutate(Discharge.cms=0.25*V.mps*Depth.m,
+         Week="w09") %>%
+  dplyr::select(Enc2,Week,Discharge.cms)
+EncDVw12<-read_excel("../FEn17/FEn17_data/videowithabiotics.xlsx") %>% 
+  left_join(TreatENC, by=c("Unit"="Enclosure")) %>%
+  mutate(Discharge.cms=0.25*Velocity*Depth,
+         Week="w12") %>% filter(Month=="Oct") %>%
+  dplyr::select(Enc2,Week,Discharge.cms)
+EncDischarge<-rbind(EncDVw09,EncDVw12)
+
+# Chlorophyll Abundance ===============
+FieldChlA<-read_excel("ChlField.xlsx")
+
+# Temperature?? =======================
+head(F.BioDens[,-c(1:6)])#those columns just identifiers
+F.BioDens$Mussel.g.m2<-F.BioDens$Mussel.g.m2 %>% replace_na(0)
+FieldFuzzyData<-F.BioDens %>% left_join(FieldDischarge) %>%
+  left_join(FieldChlA)
+head(FieldFuzzyData[,-c(1:6,54:56)])
+F.Fdist<-dsvdis(FieldFuzzyData[,-c(1:6,54:56)], 'bray')
+F.fso<-fso(FieldFuzzyData$Mussel.g.m2, F.Fdist)
+summary(F.fso)
+F.fso.plot<-FieldFuzzyData %>% mutate(mu=F.fso$mu)
+ggplot(F.fso.plot, aes(x=Mussel.g.m2, y=mu))+
+  geom_point(aes(color=Season), size=3)+geom_smooth(method="lm")
+
+ordinatedlabels<-LeonRAData[order(LeonRAData$standLRKM),]
+unordinatedlabels<-LeonRAData[order(LeonRAData$LRKMlabel),]
+greyC<-gray.colors(length(unique(Leongraph$variable)),
+                   
+                   start = 0.02, end = 0.97, gamma = 2.2, alpha = NULL)
+Leonplot<-ggplot(data = Leongraph, aes(x = standLRKM, y = value, fill=var2)) + 
+  geom_bar(stat="identity") +
+  scale_fill_manual(values=greyC, name="Species")+
+  scale_x_discrete(labels=rownames(ordinatedlabels))+
+  coord_flip()+
+  labs(x="Ordinated Sites", y="Relative Abundance") +
+  theme(axis.text.x = element_text(size=9,color="black"),
+        axis.title.y=element_text(size=20),
+        plot.background = element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major= element_line(colour=NA), 
+        panel.grid.minor=element_line(colour=NA),
+        title=element_text(size=20),
+        panel.background = element_rect(fill = "white"),
+        axis.line.x=element_line(colour="black"),
+        axis.line.y=element_line(colour="black"))
+Leonplot 
+
+##### NOTES:
+# so my fuzzy ord worked, mussel biomass can predict community
+# need to explore what that acually means in terms of taxonomy
+# [ want to make a plot like I did for Con Bio to explore ]
+# multivariate fuzzy ord also worked with 
+# mussel  biomass, water col chl, disch
+# nothing super high, but all significant
+# should plot mu mussel biomass and mu chlorophy then add treatment color
+
+F.mfso<-mfso(~FieldFuzzyData$Mussel.g.m2+FieldFuzzyData$Discharge.cms+
+               FieldFuzzyData$WC_CHLA_MG.L,
+           F.Fdist)
+summary(F.mfso)
+str(F.mfso)
+F.mfso.plot<-data.frame(Reach=FieldFuzzyData$FSamID,
+                        MB.mu=F.mfso$mu[,1],
+                        Dis.mu=F.mfso$mu[,2],
+                        Ch.mu=F.mfso$mu[,3])
+ggplot(F.mfso, aes(x=), y=F.mfso$mu[,3])+geom_point()

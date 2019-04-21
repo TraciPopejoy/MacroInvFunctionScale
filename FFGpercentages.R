@@ -14,8 +14,19 @@ FieldPerc<-FieldPCom %>% gather(Taxa, Per, -FSamID) %>% left_join(FTaxaTable) %>
                        T.TropP==5~"Shredder",
                        T.TropP==6~"Parasite")) %>%
   left_join(FieldBMest, by="Reach")
-FieldPerc
+FieldPerc %>% group_by(FSamID) %>% summarize(sum(TotalPer))
 library(ggsci)
+
+ggplot(FieldPerc,aes(x=Treatment.x,y=TotalPer, color=FFG, fill=FFG, shape=FFG))+
+  stat_summary(position=position_dodge(width=.9))+
+  scale_y_continuous(name="FFG Relative Abundance",
+                     breaks=c(0,.20,.40,.60,.80,1.00),
+                     labels=c("0%","20%","40%","60%","80%","100%"))+
+  scale_color_manual(values = c("darkred","#c5693c","#a4a934","#6796ca",
+                                "#8867d0","#c060a6"))+
+    scale_shape_manual(values=c(15:18,15:17))+
+  facet_wrap(~SamplingSeason)
+
 ggplot(FieldPerc, aes(x=Treatment, y=TotalPer, fill=FFG))+
   geom_bar(stat="identity")+facet_wrap(~SamplingSeason)
 ggplot(FieldPerc[FieldPerc$FFG=="C-Filterer",], 

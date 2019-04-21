@@ -24,9 +24,9 @@ FieldComMat<-CountField %>% group_by(Reach, SamplingSeason) %>%
   summarize_if(is.numeric, mean) %>% group_by(Reach, SamplingSeason) %>%
   summarise_if(is.numeric, funs(./0.092903)) %>%
   mutate(FSamID=paste(Reach, SamplingSeason, sep=".")) %>% ungroup()%>%
-  select(-Reach, -SamplingSeason, -Other.other, -richness) %>%
-  select(FSamID, everything())
-#need to check if this is an appropriate way to reduce the amount of samples
+  select(-Reach, -Other.other, -richness)%>%
+  mutate(Treatment=substr(FSamID, 4,5)) %>%
+  select(FSamID, Treatment,SamplingSeason,everything())
 
 FieldPCom<-CountField %>% group_by(Reach, SamplingSeason) %>% 
   summarize_if(is.numeric, mean) %>%
@@ -41,7 +41,7 @@ FieldPCom<-CountField %>% group_by(Reach, SamplingSeason) %>%
   spread(Taxa,Count) %>%  select(-id) %>% ungroup() %>%
   mutate(rowsum=rowSums(.[,-1])) %>% group_by(FSamID) %>%
   summarise_if(is.numeric,funs(./rowsum))%>%
-  select(-rowsum) %>%  select(FSamID, everything())
+  select(-rowsum) %>%   select(FSamID, everything())
 
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 length(match(names(FieldPCom[,-1]), FTaxaTable$Taxa)) #checking to make sure all taxa in taxa table
@@ -84,28 +84,32 @@ FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%
 
 #### exploring family abundance ####
 head(FieldComMat)
-View(FieldPCom %>% 
+FieldPCom %>% 
        gather(Taxa, Abundance, -FSamID) %>% group_by(Taxa) %>%
-       summarize(mean.A=mean(Abundance)*100))
-View(FieldComMat %>% select(-InvDensity.npm2) %>%
+       summarize(mean.A=mean(Abundance)*100)
+FieldComMat %>% select(-InvDensity.npm2) %>%
   gather(Taxa, Abundance, -FSamID) %>% group_by(Taxa) %>%
-  summarize(mean.A=mean(Abundance), sum.A=sum(Abundance)))
+  summarize(mean.A=mean(Abundance), sum.A=sum(Abundance))
 
 FieldGraph<-FieldComMat %>% left_join(fieldSiteKey[,-1]) %>%
   filter(!duplicated(.)) %>% left_join(FieldBMest)
 
 #ChironomidaeL - FFG minx
 ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Dip.ChironomidaeL))+
-  geom_point(size=2, aes(color=SamplingSeason))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=SamplingSeason))
 #Hydropsychidae Filter Feeder
-ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Tri.Hydropsychidae))+
-  geom_point(size=2, aes(color=SamplingSeason))+geom_smooth(method="lm")
+ggplot(FieldGraph, aes(x=Mussel.g.m2, y=Tri.Hydropsychidae))+
+  geom_smooth(method="lm", color="black") +
+  geom_point(size=2, aes(color=SamplingSeason))
 #Caenidae - C-Gather
 ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Eph.Trcorythidae))+
-  geom_point(size=2, aes(color=SamplingSeason))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=SamplingSeason))
 #Elmidae larvae
 ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Col.ElmL))+
-  geom_point(size=2, aes(color=SamplingSeason))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=SamplingSeason))
 #Oligochaeta
 ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Oligochaeta.misc))+
   geom_point(size=2, aes(color=SamplingSeason))+geom_smooth(method="lm")
@@ -146,7 +150,7 @@ ggplot(FieldGraph, aes(x=PCA1, y=PCA2))+
   scale_color_futurama()
 
 ### describe invert density ###
-FCounts<-CountField %>% 
+FCounts<-CountField %>% ungroup() %>%
   select(Reach, SamplingSeason, InvDensity.npm2, richness, Treatment) %>%
   group_by(Reach, SamplingSeason, Treatment) %>%
   summarize_if(is.numeric, mean, na.rm=T) %>%
@@ -157,6 +161,32 @@ library(lme4);library(lmerTest)
 summary(lmer(log1p(InvDensity.npm2)~Mussel.g.m2+SeasF+(1|Reach), data=FCounts))
 View(FCounts %>% group_by(Treatment) %>%
   select(-Reach, -SamplingSeason, -Site) %>%summarize_all(mean))
+
+#field sum
+FieldSum<-CountField %>% ungroup() %>% 
+  summarize_if(is.numeric,sum, na.rm=T) %>% select(-InvDensity.npm2, -richness) %>%
+  gather() %>% 
+  arrange(desc(value)) %>% mutate(rank=1:n())
+
+ggplot(FieldSum, aes(x=rank, y=value))+geom_bar(stat="identity")+
+  xlab("Abundance Rank")+ylab("Total Count")
+
+FieldSumFFG<-CountField %>% ungroup() %>%
+  select(-Sample,-Location, -Site,-Treatment,-Reach,-SamplingSeason,
+         -richness,-InvDensity.npm2) %>%
+  gather(Taxa, value) %>% group_by(Taxa) %>%
+  summarize_if(is.numeric, sum, na.rm=T) %>%left_join(FTaxaTable) %>%
+  select(Taxa, value, Order, T.TropP) %>%
+  mutate(FFG=case_when(T.TropP==1~"C-Gatherer",
+                       T.TropP==2~"C-Filterer",
+                       T.TropP==3~"Herbivore",
+                       T.TropP==4~"Predator",
+                       T.TropP==5~"Shredder")) %>%
+  arrange(desc(value)) %>% mutate(rank=1:n())
+ggplot(FieldSumFFG, aes(x=rank, y=value))+
+  geom_bar(stat="identity", aes(fill=FFG))+
+  scale_y_continuous(trans="sqrt", breaks=c(100,2000,4000,8000,12000,14000))+
+  xlab("Abundance Rank")+ylab("Total Count")
 
 ########## OLD CODE #########
 #############     Field Invert Biomass Calculation     #############

@@ -21,11 +21,11 @@ traitDIST<-FFGunk %>% group_by(Family) %>% filter(!is.na(Feed_mode_sec)) %>%
 #(mainly Le Roy Poff 2006 table)
 
 ##### MACROINVERTEBRATE DATA FROM OTHER SCRIPTS #####
-#Field Data
+source("FieldDataset.R")#Field Data 
 head(FieldPCom)
 head(FieldTraits)
 
-#Enclosure Data
+source("EnclosureDataset.R")#Enclosure Data
 head(EnclPCom)
 head(EnclTraits)
 
@@ -33,6 +33,68 @@ head(EnclTraits)
 head(ShellPCom)
 head(ShellTraits)
 
+##### Structural Difference Between Treatments #####
+library(vegan)
+## alpha diversity ##
+EnAlp<-data.frame(Enc=EnclComMat$Enc,TreatA=EnclComMat$TreatA,alpha=specnumber(EnclComMat))
+boxplot(alpha~TreatA,EnAlp)
+
+## beta diversity ##
+SorEncl<-betadiver(EnclComMat[50:99,-c(1:3)], "sor")
+(EnclbetaMod <- betadisper(SorEncl, EnclComMat$TreatA[50:99]))
+anova(EnclbetaMod) #difference between groups significant?
+permutest(EnclbetaMod, pairwise = TRUE, permutations = 99)
+## Tukey's Honest Significant Differences
+(mod.HSD <- TukeyHSD(EnclbetaMod))
+
+## gamma diversity ##
+gammaEncl<-data.frame(TreatA=c("AMBL","AMBS","ACTL","ACTS","CTRL"),
+            tot.spp=c(sum(colSums(EnclComMat[EnclComMat$TreatA=="AMBL",-c(1:3)])>0),
+                      sum(colSums(EnclComMat[EnclComMat$TreatA=="AMBS",-c(1:3)])>0),
+                      sum(colSums(EnclComMat[EnclComMat$TreatA=="ACTL",-c(1:3)])>0),
+                      sum(colSums(EnclComMat[EnclComMat$TreatA=="ACTS",-c(1:3)])>0),
+                      sum(colSums(EnclComMat[EnclComMat$TreatA=="CTRL",-c(1:3)])>0)))
+
+ran.G.E<-round(rnorm(999,mean(gammaEncl$tot.spp), sd(gammaEncl$tot.spp)),0)
+hist(ran.G.E)
+abline(v=gammaEncl$tot.spp, lty=2, lwd=4, 
+       col=c("blue","purple","red","orange","yellow"))
+gammaEncl$Zscore<-(gammaEncl$tot.spp - mean(ran.G.E)) / sd(ran.G.E)
+gammaEncl
+
+gammaField<-data.frame(Treatment=c("MR F2015","MR F2015","MR F2015","MR F2015",
+                                   "NM F2015","NM S2015","NM F2016","NM S2016"),
+               tot.spp=c(sum(colSums(FieldComMat[FieldComMat$Treatment=="MR" &
+                                                   FieldComMat$SamplingSeason=="Fall2015",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="MR" &
+                                                   FieldComMat$SamplingSeason=="Summer2015",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="MR" &
+                                                   FieldComMat$SamplingSeason=="Fall2016",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="MR" &
+                                                   FieldComMat$SamplingSeason=="Summer2016",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="NM" &
+                                                   FieldComMat$SamplingSeason=="Fall2015",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="NM" &
+                                                   FieldComMat$SamplingSeason=="Summer2015",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="NM" &
+                                                   FieldComMat$SamplingSeason=="Fall2016",
+                                                 -c(1:3)])>0),
+                         sum(colSums(FieldComMat[FieldComMat$Treatment=="NM" &
+                                                   FieldComMat$SamplingSeason=="Summer2016",
+                                                 -c(1:3)])>0)))
+ran.G.F<-round(rnorm(999,mean(gammaField$tot.spp), sd(gammaField$tot.spp)),0)
+hist(ran.G.F)
+abline(v=gammaField$tot.spp, lty=2, lwd=4, 
+       col=c("blue","purple","red","orange","yellow","goldenrod4","green","forestgreen"))
+gammaEncl$Zscore<-(gammaEncl$tot.spp - mean(ran.G.E)) / sd(ran.G.E)
+gammaEncl
+                   
 ##### AlphaFD.R from DecomposingFD #####
 source("../DecomposingFD/R/AlphaFD.R")
 #Field Samples
@@ -62,8 +124,8 @@ ggplot(FSitesAlpha, aes(x=Mussel.g.m2, y=qDTM, color=SamSeaF))+
   ylab("qDTM\nintegrates Fn diversity & dispersion")+
   geom_smooth(aes(group=SamplingSeason), method="lm", level=0, color="black")+
   facet_wrap(~SamSeaF)+theme_bw()
-summary(lm(qDTM~Mussel.g.m2+SamplingSeason, data=FSitesAlpha))
-ggplot(FSitesAlpha, aes(x=SamplingSeason, y=qDTM, fill=Treatment.x))+
+summary(lm(qDTM~Treatment.x+Mussel.g.m2+SamSeaF, data=FSitesAlpha))
+ggplot(FSitesAlpha, aes(x=SamSeaF, y=qDTM, fill=Treatment.x))+
   geom_boxplot(aes(group=interaction(SamplingSeason,Treatment.x)))+
   ylab("qDTM\nintegrates Fn diversity & dispersion")+
   theme(legend.direction="horizontal",legend.position = "bottom")
@@ -241,9 +303,7 @@ CG<-diverge_hcl(5, h=c(280,180), c = 100, l = c(50, 90), power = 1)
 CG[3]<-"lightgrey"
 show_col(CG)
 
-FCounts<-meanCount2016 %>% 
-  select(Reach, SamplingSeason, InvDensity.npm2, richness, Treatment) %>%
-  mutate(SeasF=factor(SamplingSeason, levels=c("Summer2016","Fall2016")))
+
 head(FCounts)
 ECounts<-ECounts %>% 
   mutate(TreFac=factor(TreatA, levels=c("CTRL","ACTL","ACTS","AMBL","AMBS")))
@@ -258,10 +318,12 @@ fdens<-ggplot(FCounts, aes(x=SeasF, y=InvDensity.npm2, fill=Treatment))+
   scale_fill_manual(name="River Reach\nTreatment",
                     labels=c("Mussel Bed","Control"),
                     values = CP[c(1,3)])+
-  scale_y_continuous(name=expression("Macroinvertebrates per m " ^ -2))+
+  scale_y_continuous(name=expression("Macroinvertebrates per m " ^ -2), trans="log1p",
+                     breaks = c(1,500, 750,1000,2500,5000,10000,15000))+
   scale_x_discrete(name="Sampling Period", 
-                   labels=c("Summer 2016","Fall 2016"))+
-  theme(legend.justification=c(1,1),legend.position = c(0.575,1))
+                   labels=c("Su 2015", "F 2015", "Su 2016", "F 2016"))+
+  theme(legend.justification=c(1,1),legend.position = c(0.27,1),#legend.position = c(0.575,1)
+        legend.text=element_text(size=10))
 edenss<-ggplot(ECounts, aes(x=Week, y=InvertDensity.npm2, fill=TreFac))+
   geom_boxplot(aes(group=interaction(Week,TreFac)))+
   scale_fill_manual(name="Enclosure\nTreatment",
@@ -269,7 +331,8 @@ edenss<-ggplot(ECounts, aes(x=Week, y=InvertDensity.npm2, fill=TreFac))+
   scale_y_continuous(name=expression("Macroinvertebrates per m " ^ -2))+
   scale_x_discrete(name="Sampling Period", 
                    labels=c("Sept. 2017","Oct. 2017"))+
-  theme(legend.justification=c(1,1),legend.position = c(0.5,1))
+  theme(legend.justification=c(1,1),legend.position = c(0.27,1),#legend.position = c(0.5,1)
+        legend.text=element_text(size=10))
 sdens<-ggplot(SCounts, aes(x=TreatA, y=InvertDensity.npcm2/0.0001, fill=ShID))+
   geom_boxplot(aes(group=interaction(TreatA,ShID))) +
   scale_fill_manual(name="Shells",
@@ -277,8 +340,9 @@ sdens<-ggplot(SCounts, aes(x=TreatA, y=InvertDensity.npcm2/0.0001, fill=ShID))+
                     labels=c("Live ACT", "Sham ACT","Live AMB","Sham AMB"))+
   scale_y_continuous(name=expression("Macroinvertebrates per m " ^ -2))+
   scale_x_discrete(name="Enclosure Treatment")+
-  theme(legend.justification=c(1,1),legend.position = c(1,1)),
-        legend.direction="horizontal")+guides(fill=guide_legend(nrow=2))
+  theme(legend.justification = c(1,1),legend.position = c(1,1),
+        legend.direction="horizontal", legend.text=element_text(size=10))+
+  guides(fill=guide_legend(nrow=2))
 library(cowplot)
 plot_grid(sdens,edenss,fdens, ncol=3,labels = "AUTO")
 ggsave("InvertDensity.tiff", dpi=600, width = 10, height = 3.5, units="in")

@@ -1,19 +1,3 @@
-#### Invertebrates on Shells ####
-library(readxl);library(tidyverse)
-#bring in treatment data from enclosures
-TreatENC<-read_excel("../FEn17/FEn17_data/FEn17OKTreatments.xlsx") 
-#bring in mussel data from enclosures
-MusselData<-read_csv("../FEn17/FEn17_data/MusselBMExpFEn17OK.csv")
-names(MusselData)[1]<-"Enclosure"
-#calculate shell surface area by enclosure & species
-MDat<-MusselData %>% full_join(TreatENC)%>% 
-  select(Enc2,Genus, TreatA, Type,Spp,L, H,W) %>% 
-  mutate(ShellSpecies=recode(Genus, "AMBL"="AMB", "ACT"="ACT"),
-         ShellSurArea.mm2=2*(L*H)+2*(L*W)+2*(H*W),
-         SamID=paste(Enc2, ShellSpecies, sep=".")) %>%
-  group_by(Enc2,TreatA,SamID) %>% 
-  summarize(TShellSurArea.cm2=sum(ShellSurArea.mm2, na.rm=T)*.01)
-#the ones with 0 I didn't measure height on them b/c not needed
 
 #bring in macroinvertebrates lengths on shell data
 shellInv<-read_excel("../FEn17/FEn17_data/ShellInv.xlsx")
@@ -35,7 +19,7 @@ ShellComMat<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>%
                                 SamID=paste(Enc2, ShellSpecies, sep=".")) %>%
   select(Enc2, ShellSpecies,SamID, Taxa, IndDensity.cm2) %>% 
   mutate(id=1:n()) %>% 
-  spread(Taxa,IndDensity.cm2) %>% group_by(SamID) %>%
+  spread(Taxa,IndDensity.cm2) %>% group_by(SamID)%>%
   summarise_if(is.numeric,funs(mean(.[which(!is.na(.))]))) %>%
   select(-id)
 
@@ -77,6 +61,15 @@ View(ShellComMat %>%
        gather(Taxa, Abundance, -SamID) %>% group_by(Taxa) %>%
        summarize(mean.A=mean(Abundance, na.rm=T), sum.A=sum(Abundance, na.rm=T)))
 
+##### biomass #####
+MusBioShell<-MusselData %>% left_join(TreatENC) %>%
+  mutate(BiomassE=case_when(Genus=="AMB"~ 1.57e-6*L^3.21,
+                            Genus=='ACT'~ 4.7e-7*L^3.51)) %>%
+  group_by(Enc2, Genus, Treatment) %>%
+  summarize(sumBM=sum(BiomassE, na.rm=T), 
+            meanBM=mean(BiomassE,na.rm=T), 
+            sdBM=sd(BiomassE, na.rm=T))
+
 ShellGraph<-ShellComMat %>% 
   mutate(Enc2=substr(SamID, 1,3), Genus=substr(SamID, 5,7)) %>%
   left_join(TreatENC) %>% left_join(MusBioShell) %>%
@@ -85,16 +78,20 @@ ShellGraph<-ShellComMat %>%
 
 #ChironomidaeL - FFG minx
 ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Dip.ChironomidaeL))+
-  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=Treat.Shell))
 #Polycentropidae - Predator
 ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Tri.Polycentropidae))+
-  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=Treat.Shell))
 #Heptageniidae
 ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Eph.Heptageniidae))+
-  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=Treat.Shell))
 #Elmidae larvae
 ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Col.ElmL))+
-  geom_point(size=2, aes(color=Treat.Shell))+geom_smooth(method="lm")
+  geom_smooth(method="lm", color="black")+
+  geom_point(size=2, aes(color=Treat.Shell))
 
 ggplot(ShellGraph, aes(x=log1p(Dip.ChironomidaeL)))+geom_histogram()
 ggplot(ShellGraph, aes(x=log1p(Tri.Polycentropidae)))+geom_histogram()
@@ -109,6 +106,7 @@ print(shell.pca)
 
 ShellGraph<-ShellGraph %>% mutate(PCA1=shell.pca$x[,1],
                                   PCA2=shell.pca$x[,2])
+library(ggsci)
 ggplot(ShellGraph, aes(x=PCA1, y=PCA2))+
   geom_point(aes(color=Treat.Shell))+
   scale_color_futurama()
@@ -125,8 +123,8 @@ ggplot(PCAline)+
   labs(x=NULL,y=NULL)+theme_classic()
 
 #### nmds ####
-head(SCountsT)
-ShellCom<-SCountsT %>% ungroup() %>% group_by(SamID) %>% spread(Taxa, RA) %>%
+head(SCounts)
+ShellCom<-SCounts %>% ungroup() %>% group_by(SamID) %>% spread(Taxa, RA) %>%
   select(-richness, -TShellSurArea.cm2, -InvertDensity.npcm2,-Enclosure,
          -TreatA, -TreatF, -Type, -Spp,-Enc2, -ShellSpecies, -Nsam, -N) %>%
   summarise_all(funs(mean(., na.rm = TRUE)))
@@ -183,11 +181,14 @@ ggplot() +
         panel.grid.minor = element_blank(),  #remove minor-grid labels
         plot.background = element_blank())
 
-##### biomass #####
-MusBioShell<-MusselData %>% left_join(TreatENC) %>%
-  mutate(BiomassE=case_when(Genus=="AMB"~ 1.57e-6*L^3.21,
-                            Genus=='ACT'~ 4.7e-7*L^3.51)) %>%
-  group_by(Enc2, Genus, Treatment) %>%
-  summarize(sumBM=sum(BiomassE, na.rm=T), 
-            meanBM=mean(BiomassE,na.rm=T), 
-            sdBM=sd(BiomassE, na.rm=T))
+
+###Shell Sum
+ShellSum<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>% 
+  mutate(SamID=paste(Enc2,ShellSpecies, sep=".")) %>% summarize(N=n()) %>%
+  group_by(Taxa) %>% summarize_if(is.numeric,sum, na.rm=T)%>%
+  arrange(desc(N)) %>% mutate(rank=1:n())
+ggplot(ShellSum, aes(x=rank, y=N))+geom_bar(stat="identity")+
+  xlab("Abundance Rank")+ylab("Total Count")
+  
+
+                                       
