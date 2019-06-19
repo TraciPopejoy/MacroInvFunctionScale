@@ -1,10 +1,25 @@
+library(tidyverse); library(readxl)
 ### covariables - environment and spatial
 # Spatial Information =================
 FieldSpData<-read_excel("./data/HotSpotLocations.xlsx") %>% 
-  mutate(Reach=paste(SiteID, Treatment, sep="-"))
+  mutate(Reach=paste(SiteID, Treatment, sep="-")) %>% dplyr::select(-`Drainage - HUC 8`)
 library(sp)
 coordinates(FieldSpData)<-c("Longitude","Latitude")
 plot(FieldSpData)
+text(FieldSpData, labels=FieldSpData$SiteID)
+
+# HUC12 (or HUC8) for spatial autocorrelation 
+library(rgdal)
+SEOKhu12<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU12")
+SEOKhu8<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU8")
+
+proj4string(FieldSpData) <- proj4string(SEOKres)
+FieldSpData$HUC12 <- as.character(over(FieldSpData, SEOKhu12)$HUC12)
+plot(SEOKhu12[SEOKhu12$HUC12 %in% FieldSpData$HUC12,])
+text(FieldSpData, labels=FieldSpData$SiteID)
+FieldSpData$HUC8 <- as.character(over(FieldSpData, SEOKhu8)$HUC8)
+plot(SEOKhu8[SEOKhu8$HUC8 %in% FieldSpData$HUC8,])
+text(FieldSpData, labels=FieldSpData$SiteID)
 
 # Discharge ===========================
 FieldDischarge<-read_excel("./data/Field Discharge.xlsx") %>% 
@@ -63,3 +78,28 @@ ShellChl<-ShellChl %>% left_join(MDat[,3:4], by="SamID") %>%
          ChlAdensity=26.7*((`664nm`-fir750nm)-(`665nm`-sec750nm))*(Vacetone/VolFilrwe)*(BucketVol2/TShellSurArea.cm2)*1)%>%
   dplyr::select(SamID,Enc2,ChlAdensity, TShellSurArea.cm2)
 
+# Pebble Counts ==============
+peb.raw<-read_excel("./data/Pebble Counts.xlsx", sheet = "Pebble Counts Reprocessed")
+#install_github("bceaton/GSDtools")
+library(GSDtools)
+peb.wolfman<-peb.raw[,1:3]
+for(k in 1:nrow(peb.raw)){
+  store<-MakeCFD(as.matrix(peb.raw[k,4:104]))
+  wolf<-WolmanCI(store, n=100, P=c(10,50,90))
+  sub<-data.frame(D10=wolf[1,2],
+           D10low=wolf[1,3],
+           D10high=wolf[1,4],
+           D50=wolf[2,2],
+           D50low=wolf[2,3],
+           D50high=wolf[2,4],
+           D90=wolf[3,2],
+           D90low=wolf[3,3],
+           D90high=wolf[3,4])
+  peb.wolfman[k,4:12]<-sub
+}
+
+ggplot(store, aes(x=size, y=probs))+geom_point()+geom_line()+
+  scale_x_log10(breaks=c(0.1,0.3,1,3,10,30,100))
+peb.melt<-peb.wolfman %>% select(-Date) %>% gather(key,value,-SiteID, -Reach)
+ggplot(peb.melt[peb.melt$key %in% c("D10","D50","D90"),], 
+       aes(x=key, y=value))+geom_boxplot()+facet_wrap(~Reach)
