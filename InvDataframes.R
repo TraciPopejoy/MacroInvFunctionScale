@@ -10,8 +10,9 @@
 
 library(tidyverse); library(ggplot2); library(readxl); library(vegan)
 # Biomass Function -----------------------
-BiomassReg<-read_excel("Macroinv Power Law Coeffs TBP.xlsx", sheet = 1)
-BMTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.xlsx", sheet = 4)
+BiomassReg<-read_excel("Macroinv Power Law Coeffs TBP.xlsx", sheet = 1) #sheet that holds regression coefficients
+BMTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.xlsx", sheet = 4) #taxa table to match taxa to correct regression
+#function to calculate biomass (in mg) given a length
 biomass<-function(Fam, Ord, Length) {
   #tmass<-NULL
   #if not ID'd to family, use order level regressions
@@ -32,6 +33,7 @@ biomass<-function(Fam, Ord, Length) {
 }
 
 # Field Data ------------------------------
+# count data for the surber samples
 Count2016<-read_excel("./data/2016 Field Data.xlsx", sheet = "Counts") %>%
   mutate(Reach=paste(Site, Treatment, sep="-")) %>% 
   group_by(Sample, Location, Site, Treatment, Reach, SamplingSeason) %>% 
@@ -45,7 +47,7 @@ CountField<-rbind(Count2016, Count2015)
 CountField$InvDensity.npm2<-rowSums(CountField[,7:68], na.rm=T)/0.092903
 CountField[is.na(CountField)]<-0
 CountField$richness<-specnumber(CountField[,7:68])
-#good raw dataframe for Field Data
+#good raw count dataframe for Field Data
 
 # Sample ID key
 fieldSiteKeyA<-CountField %>% group_by(Sample, Reach, SamplingSeason, Treatment) %>% 
@@ -62,8 +64,9 @@ FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%
          Treatment=case_when(substr(Site, 3,4)=="NM"~"NM",
                              T~"MR"),
          Reach=paste(substr(Site,1,2),Treatment, sep="-")) 
-fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest)
-#fieldSiteKey %>% group_by(Reach, SamplingSeason) %>% tally() #surber number
+fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest) %>%
+  mutate(SampSeaF=factor(SamplingSeason, levels=c("Summer2015","Fall2015","Summer2016","Fall2016")))
+#fieldSiteKey is a good 'treatment' dataframe
 
 #field data community matrix in density; units are n/m2
 F.ComDens<-CountField %>% group_by(Reach, SamplingSeason) %>% 
@@ -97,11 +100,15 @@ F.ComPer<-CountField %>% group_by(Reach, SamplingSeason) %>%
   select(-Quadrat.n, -Mussel.bm.g, -Site) %>%
   select(FSamID,Reach,SamplingSeason, Treatment,Season,Mussel.g.m2, everything())
 
+#like biomass taxa table, but 'correct' taxonomic information
+#biomass taxa table has 'misc' for some orders to filter (b/c no regressions for that order)
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 #checking to make sure all taxa in taxa table
-match(names(F.ComPer[,-c(1:6)]), FTaxaTable$Taxa) 
+which(is.na(match(names(F.ComPer[,-c(1:6)]), FTaxaTable$Taxa)))
 
 # Field Biomass estimate ==============
+# lengths measured from the surber data
+# all organisms measured up to 100 or 10%, whichever is larger
 Lengths2015<-read_excel("./data/2015 Data Hotspot Field Surber.xlsx", sheet= 3,
                         col_types = c("text","text","text","date","text",
                                       "numeric","numeric","numeric","numeric",
@@ -127,6 +134,7 @@ melt2015lengths<-Lengths2015 %>% group_by(Sample, Reach, SamplingSeason) %>%
   rowwise() %>% 
   mutate(BM.mg=mean(biomass(Family, Order, Length.mm))) 
 
+#because not all were measured, taking an average biomass to multiply by the count
 samp2015count<-Count2015 %>% ungroup() %>% dplyr::select(-Location, -Site, -Treatment, 
                                                   -Reach, -Other.other) %>%
   gather(Taxa, Count, -Sample, -SamplingSeason) %>% filter(Count!=0)
@@ -209,6 +217,7 @@ F.BioPer<-rbind(SxT2015Long, SxT2016Long) %>%
   select(FSamID,Reach,SamplingSeason, Treatment,Season,Mussel.g.m2, everything())
 
 # Enclosure Treatment / Biomass data -------
+#treatment data frame
 TreatENC<-read_excel("../FEn17/FEn17_data/FEn17OKTreatments.xlsx") 
 # mussel regressions
 mreg<-read_excel("../FEn17/FEn17_data/LENGTH-MASS_CLA_CCV_20161208-reg coefficients.xlsx",
@@ -230,6 +239,7 @@ MusselData %>% left_join(TreatENC) %>%
                             Genus=='ACT'~ 4.7e-7*L^3.51))%>%
   group_by(Genus) %>%
   summarize(meanBM=mean(BiomassE, na.rm=T))
+# mussel biomass in each enclosure 
 MusBiomass<-MusselData %>% left_join(TreatENC) %>%
   mutate(BiomassE=case_when(Notes=="NotRecovered"&Genus=="AMB"~3.47,
                             Notes=="NotRecovered"&Genus=="ACT"~7.64,
@@ -254,11 +264,6 @@ FEn17Inv09<-read.csv("../FEn17/FEn17_data/FEn17w09.csv", stringsAsFactors = F) %
          TEid=paste(Week, Enc, sep=""))
 EnclInv<-rbind(FEn17Inv12, FEn17Inv09) #contains every insect identified from baskets
 # unique(EnclInv$Taxa)[order(unique(EnclInv$Taxa))] #check taxa for correct spelling
-ggplot(EnclInv, aes(x=Length.cm))+
-  geom_histogram(aes(fill=Week))+
-  geom_vline(aes(xintercept=mean(Length.cm)))+
-               facet_wrap(~Week)+theme_bw()
-
 
 # Calculate area sampled 
 BaskSamp<-read.csv("../FEn17/FEn17_data/SubSamFEn17OK.csv", stringsAsFactors = F) %>%
@@ -313,7 +318,7 @@ E.ComPer<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
 
 # Enclosure Biomass ===========
-head(EnclInv)
+#head(EnclInv)
 EBiomass<-EnclInv %>% left_join(BMTaxaTable) %>% filter(Order!="misc")%>% 
   rowwise()%>% 
   mutate(Length.mm=Length.cm*10,
@@ -342,6 +347,8 @@ E.BioPer<- EBiomass %>% group_by(TEid, Taxa) %>%
   select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
 
 # Shell Invertebrates -----------
+#shell invertebrates sampled by collecting mussels or sham 
+#and putting them in separate buckets based on their speciese
 shellInv<-read_excel("../FEn17/FEn17_data/ShellInv.xlsx")
 #long list of macroinvertebrate lengths
 SInv<-shellInv %>% filter(Taxa!="Spider") %>% 
