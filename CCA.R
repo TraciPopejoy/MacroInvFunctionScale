@@ -3,17 +3,20 @@
 ### to do: 
 #take out weird taxa - adult diptera, isotomidae, Hymenoptera, other.other, 
 #isopoda - probably terrestrial fall ins
+#read vegan tutorial for this
+    #specifically should I use z scores and or transform community data set
+#finish measuring enclosure pebbles fuckkkkkk
+
 
 #Field
 #Hypothesis: hydrology/temperature drives community structure
-#predict: discharge & season will explain more variation than musses
+#predict: discharge & season will explain more variation than mussels
 # mussels should be correlated with discharge though
-CCAField.data<-F.ComDens %>% left_join(FieldDischarge) %>% 
-  left_join(FieldChlA) %>% dplyr::select(-Hymenoptera.miscH,
-                                         -Entom.Isotomidae,
-                                         -Other.other,
-                                         -Isopoda.miscI) %>%
-  mutate(Site=substr(Reach, 1,2))
+CCAField.data<-F.ComDens %>% left_join(Fenv.data) %>% 
+  dplyr::select(-Hymenoptera.miscH,
+                -Entom.Isotomidae,
+                -Other.other,
+                -Isopoda.miscI)
 CCAField.data$Mussel.g.m2<-replace_na(CCAField.data$Mussel.g.m2,0)
 CCAField.data[CCAField.data$FSamID=="GL-MR.Fall2015","Discharge.cms"]<-0.0294 #usgs
 CCAField.data[CCAField.data$FSamID=="GL-NM.Fall2015","Discharge.cms"]<-0.0274 #usgs
@@ -21,48 +24,52 @@ CCAField.data[CCAField.data$FSamID=="KT-MR.Fall2015","Discharge.cms"]<-0.109
 CCAField.data[CCAField.data$FSamID=="L3-MR.Summer2015","Discharge.cms"]<-0.819 
 CCAField.data[CCAField.data$FSamID=="L3-NM.Summer2015","Discharge.cms"]<-0.556 
 
-names(CCAField.data[,-c(1:7,66:69)])
-cca.F<-cca(CCAField.data[,-c(1:7,66:69)]~
-             CCAField.data$Mussel.g.m2+CCAField.data$Discharge.cms+
-             CCAField.data$Season)
+names(CCAField.data[,-c(1:7,66:75)]) #identifying inverts
+#partial cca that takes the site affect out (using HUC12num)
+cca.F<-cca(CCAField.data[,-c(1:7,66:75)]~Mussel.g.m2+Discharge.cms+
+             D50+Condition(HUC12num), CCAField.data)
 cca.F
 ccaF.plot<-plot(cca.F)
 cca.F.sum<-summary(cca.F)
 #str(cca.F.sum)
 sort(cca.F.sum$biplot[,1])
-CCAF.impsp<-c(names(sort(cca.F.sum$species[,1],decreasing=T)[1:4]),
-              names(sort(cca.F.sum$species[,1], decreasing=F)[1:4]),
-              names(sort(cca.F.sum$species[,2],decreasing=T)[1:4]),
-              names(sort(cca.F.sum$species[,2], decreasing=F)[1:4]))#how much variation each CCA contributes to constraint variation explained
+#how much variation each CCA contributes to constraint variation explained
+CCAF.impsp<-data.frame(CCA1.high=names(sort(cca.F.sum$species[,1],decreasing=T)[1:4]),
+              CCA1.low=names(sort(cca.F.sum$species[,1], decreasing=F)[1:4]),
+              CCA2.high=names(sort(cca.F.sum$species[,2],decreasing=T)[1:4]),
+              CCA2.low=names(sort(cca.F.sum$species[,2], decreasing=F)[1:4]))
 cca.F.sum$concont
 cca.F.sum$constr.chi/cca.F.sum$tot.chi*100
+
+anova(cca.F, by="term", perm=500) #significance of each term
 
 # Enclosure
 #Hypothesis: Mussels biomass drives com structure, but little difference between sp
 #Predict: MusselBM explains most variation, followed by chlA abun
-CCAEnc.data<-E.ComDens %>% left_join(EncDischarge) %>% 
-  left_join(EncChlAraw) %>% filter(!is.na(ChlAdensity)) %>%
+CCAEnc.data<-E.ComDens %>% left_join(Eenv.data)%>% 
+  filter(!is.na(ChlAdensity)) %>%
   filter(Week=="w12") %>% dplyr::select(-Entom.Isotomidae,
                                         -Isopoda.miscI)
 CCAEnc.data[!is.na(CCAEnc.data$ChlAdensity) &
               CCAEnc.data$ChlAdensity<=0,"ChlAdensity"]<-0
 
-names(CCAEnc.data[,-c(1:8,55:56)])
-cca.E<-cca(CCAEnc.data[,-c(1:8,55:56)]~CCAEnc.data$MusselBiomass.g.m2+
-             CCAEnc.data$Spp+CCAEnc.data$Type+
-             CCAEnc.data$Discharge.cms+CCAEnc.data$ChlAdensity)
+names(CCAEnc.data[,-c(1:8,55:59)])
+cca.E<-cca(CCAEnc.data[,-c(1:8,55:59)]~MusselBiomass.g.m2+Spp+Type+
+             Discharge.cms+ChlAdensity, CCAEnc.data)
 cca.E
 ccaE.plot<-plot(cca.E, scaling=1)
 cca.E.sum<-summary(cca.E)
 #str(cca.F.sum)
 sort(cca.E.sum$biplot[,1]) #loadings on CCA1
-CCAE.impsp<-c(names(sort(cca.E.sum$species[,1],decreasing=T)[1:4]),
-              names(sort(cca.E.sum$species[,1], decreasing=F)[1:4]),
-              names(sort(cca.E.sum$species[,2],decreasing=T)[1:4]),
-              names(sort(cca.E.sum$species[,2], decreasing=F)[1:4]))#how much variation each CCA contributes to constraint variation explained
+#how much variation each CCA contributes to constraint variation explained
+CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[1:4]),
+                       CCA1.low=names(sort(cca.E.sum$species[,1], decreasing=F)[1:4]),
+                       CCA2.high=names(sort(cca.E.sum$species[,2],decreasing=T)[1:4]),
+                       CCA2.low=names(sort(cca.E.sum$species[,2], decreasing=F)[1:4]))
 cca.E.sum$concont
 #porportion explained by constraints
 cca.E.sum$constr.chi/cca.E.sum$tot.chi*100
+anova(cca.E, by="term", perm=1000)
 
 #Shell
 #Hypothesis: Mussel spp/type begins to matter due to differencese 
@@ -72,24 +79,27 @@ CCAS.data<-S.ComDens %>%
   left_join(EncDischarge[EncDischarge$Week=="w12",]) %>% 
   left_join(ShellChl) %>% dplyr::select(-Dip.Adult,
                                         -Orthoptera,
-                                        -Entom.Isotomidae)
-names(CCAS.data[,c(1:7,38:41)])
-cca.S<-cca(CCAS.data[,-c(1:7,38:41)]~CCAS.data$ShellSpecies+
-             CCAS.data$Type+CCAS.data$Discharge.cms+
-             CCAS.data$ChlAdensity)
+                                        -Entom.Isotomidae) %>%
+  filter(!is.na(ChlAdensity))
+CCAS.data[!is.na(CCAS.data$ChlAdensity) &
+              CCAS.data$ChlAdensity<=0,"ChlAdensity"]<-0
+names(CCAS.data[,-c(1:7,38:41)])
+cca.S<-cca(CCAS.data[,-c(1:7,38:41)]~ShellSpecies+Type+Discharge.cms+
+             ChlAdensity, CCAS.data)
 cca.S
 ccaS.plot<-plot(cca.S)
 cca.S.sum<-summary(cca.S)
 sort(cca.S.sum$biplot[,1]) #loadings on CCA1
 sort(cca.S.sum$biplot[,2])
-CCAS.impsp<-c(names(sort(cca.S.sum$species[,1],decreasing=T)[1:4]),
-              names(sort(cca.S.sum$species[,1], decreasing=F)[1:4]),
-              names(sort(cca.S.sum$species[,2],decreasing=T)[1:4]),
-              names(sort(cca.S.sum$species[,2], decreasing=F)[1:4]))
+CCAS.impsp<-data.frame(CCA1.high=names(sort(cca.S.sum$species[,1],decreasing=T)[1:4]),
+              CCA1.low=names(sort(cca.S.sum$species[,1], decreasing=F)[1:4]),
+              CCA2.high=names(sort(cca.S.sum$species[,2],decreasing=T)[1:4]),
+              CCA2.low=names(sort(cca.S.sum$species[,2], decreasing=F)[1:4]))
 #how much variation each CCA contributes to constraint variation explained
 cca.S.sum$concont
 #porportion explained by constraints
 cca.S.sum$constr.chi/cca.S.sum$tot.chi*100 
+anova(cca.S, by="term", perm=1000)
 
 #install.packages("devtools")
 #devtools::install_github("gavinsimpson/ggvegan")

@@ -13,13 +13,15 @@ library(rgdal)
 SEOKhu12<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU12")
 SEOKhu8<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU8")
 
-proj4string(FieldSpData) <- proj4string(SEOKres)
+proj4string(FieldSpData) <- proj4string(SEOKhu12)
 FieldSpData$HUC12 <- as.character(over(FieldSpData, SEOKhu12)$HUC12)
 plot(SEOKhu12[SEOKhu12$HUC12 %in% FieldSpData$HUC12,])
 text(FieldSpData, labels=FieldSpData$SiteID)
 FieldSpData$HUC8 <- as.character(over(FieldSpData, SEOKhu8)$HUC8)
 plot(SEOKhu8[SEOKhu8$HUC8 %in% FieldSpData$HUC8,])
 text(FieldSpData, labels=FieldSpData$SiteID)
+FieldSpData$HUC12num<-as.numeric(paste(FieldSpData$HUC12)) 
+FieldSpData$HUC8num<-as.numeric(paste(FieldSpData$HUC8)) 
 
 # Discharge ===========================
 FieldDischarge<-read_excel("./data/Field Discharge.xlsx") %>% 
@@ -82,7 +84,7 @@ ShellChl<-ShellChl %>% left_join(MDat[,3:4], by="SamID") %>%
 peb.raw<-read_excel("./data/Pebble Counts.xlsx", sheet = "Pebble Counts Reprocessed")
 #install_github("bceaton/GSDtools")
 library(GSDtools)
-peb.wolfman<-peb.raw[,1:3]
+peb.wolfman<-peb.raw[,1:3]  %>% rename(Treatment = Reach) %>% mutate(Reach=paste(SiteID, Treatment, sep="-"))
 for(k in 1:nrow(peb.raw)){
   store<-MakeCFD(as.matrix(peb.raw[k,4:104]))
   wolf<-WolmanCI(store, n=100, P=c(10,50,90))
@@ -95,11 +97,46 @@ for(k in 1:nrow(peb.raw)){
            D90=wolf[3,2],
            D90low=wolf[3,3],
            D90high=wolf[3,4])
-  peb.wolfman[k,4:12]<-sub
+  peb.wolfman[k,5:13]<-sub
 }
 
 ggplot(store, aes(x=size, y=probs))+geom_point()+geom_line()+
   scale_x_log10(breaks=c(0.1,0.3,1,3,10,30,100))
-peb.melt<-peb.wolfman %>% select(-Date) %>% gather(key,value,-SiteID, -Reach)
-ggplot(peb.melt[peb.melt$key %in% c("D10","D50","D90"),], 
-       aes(x=key, y=value))+geom_boxplot()+facet_wrap(~Reach)
+
+enc.peb.raw<-read_excel("./data/Enc_pebblecounts.xlsx", sheet = 1) %>% 
+  dplyr::select(-Angle) %>% mutate(Enclosure=substr(Image.Name, 1,2),
+                                   Week=case_when(substr(Image.Name, 3,5)=="Oct"~"w12",
+                                                  substr(Image.Name, 3,5)=="Sep"~"w09"),
+                                   PebSize=Minor.Axis*10) %>%
+  group_by(Image.Name) %>% mutate(peb.n=n())
+enc.wolfman<-data.frame(Image.Name=unique(enc.peb.raw$Image.Name)) %>%
+  mutate(Enclosure=substr(Image.Name, 1,2),
+         Week=case_when(substr(Image.Name, 3,5)=="Oct"~"w12",
+                        substr(Image.Name, 3,5)=="Sep"~"w09"))
+for(p in 1:length(unique(enc.peb.raw$Image.Name))){
+  store<-MakeCFD(as.matrix(enc.peb.raw[enc.peb.raw$Image.Name==unique(enc.peb.raw$Image.Name)[p],8]))
+  wolf<-WolmanCI(store, n=unique(enc.peb.raw$peb.n)[p], P=c(10,50,90))
+  sub<-data.frame(D10=wolf[1,2],
+                  D10low=wolf[1,3],
+                  D10high=wolf[1,4],
+                  D50=wolf[2,2],
+                  D50low=wolf[2,3],
+                  D50high=wolf[2,4],
+                  D90=wolf[3,2],
+                  D90low=wolf[3,3],
+                  D90high=wolf[3,4])
+  enc.wolfman[p,4:12]<-sub
+}
+
+# Summary =========
+#joined data frames
+Fenv.data<-FieldChlA %>% full_join(FieldDischarge) %>% 
+  left_join(FieldSpData@data) %>%
+  left_join(peb.wolfman) %>% 
+  select(Reach,SamplingSeason,WC_CHLA_MG.L,Benthic_CHLA_MG.M2,
+         Discharge.cms,HUC8num,HUC12num,D10,D50,D90)
+
+Eenv.data<-EncChlAraw %>% left_join(EncDischarge) %>% 
+  left_join(TreatENC) %>% left_join(enc.wolfman) %>%
+  select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
+         D10, D50, D90)
