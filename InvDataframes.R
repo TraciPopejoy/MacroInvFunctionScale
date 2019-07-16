@@ -64,8 +64,14 @@ FieldBMest<-read.csv("dw_L-W_est_by individualOLS-USETHIS.csv") %>%
          Treatment=case_when(substr(Site, 3,4)=="NM"~"NM",
                              T~"MR"),
          Reach=paste(substr(Site,1,2),Treatment, sep="-")) 
-fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest) %>%
-  mutate(SampSeaF=factor(SamplingSeason, levels=c("Summer2015","Fall2015","Summer2016","Fall2016")))
+fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest, by=c("Reach","Treatment")) %>%
+  mutate(SampSeaF=factor(SamplingSeason, levels=c("Summer2015","Fall2015","Summer2016","Fall2016")),
+         Year=case_when(SamplingSeason=="Summer2015" |
+                        SamplingSeason=="Fall2015"~2015,
+                        SamplingSeason=="Summer2016" |
+                        SamplingSeason=="Fall2016"~2016))
+fieldSiteKey[fieldSiteKey$Reach=="K7-NM",c(8:10)]<-0
+which(is.na(fieldSiteKey), arr.ind = T)
 #fieldSiteKey is a good 'treatment' dataframe
 
 #field data community matrix in density; units are n/m2
@@ -104,7 +110,7 @@ F.ComPer<-CountField %>% group_by(Reach, SamplingSeason) %>%
 #biomass taxa table has 'misc' for some orders to filter (b/c no regressions for that order)
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 #checking to make sure all taxa in taxa table
-which(is.na(match(names(F.ComPer[,-c(1:6)]), FTaxaTable$Taxa)))
+which(is.na(match(names(F.ComPer[,-c(1:6,61)]), FTaxaTable$Taxa)))
 
 # Field Biomass estimate ==============
 # lengths measured from the surber data
@@ -122,7 +128,9 @@ Lengths2015<-read_excel("./data/2015 Data Hotspot Field Surber.xlsx", sheet= 3,
                                       "numeric","numeric","numeric","numeric",
                                       "numeric","numeric","numeric","numeric",
                                       "numeric","numeric","numeric","numeric",
-                                      "numeric","numeric","text")) %>%
+                                      "numeric","numeric","numeric","numeric",
+                                      "numeric","numeric","numeric","numeric",
+                                      "text")) %>%
   filter(substr(Sample,1,11) != "CALIBRATION")
 #(Mtax15<-colnames(Lengths2015)[6:50])
 
