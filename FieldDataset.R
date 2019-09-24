@@ -91,7 +91,7 @@ FieldComMat %>% select(-InvDensity.npm2) %>%
   gather(Taxa, Abundance, -FSamID) %>% group_by(Taxa) %>%
   summarize(mean.A=mean(Abundance), sum.A=sum(Abundance))
 
-FieldGraph<-FieldComMat %>% left_join(fieldSiteKey[,-1]) %>%
+FieldGraph<-F.ComDens %>% left_join(fieldSiteKey[,-1]) %>%
   filter(!duplicated(.)) %>% left_join(FieldBMest)
 
 #ChironomidaeL - FFG minx
@@ -120,7 +120,7 @@ ggplot(FieldGraph, aes(x=Mussel.g.m2,y=Eph.Heptageniidae))+
 ggplot(FieldGraph, aes(x=log1p(Dip.ChironomidaeL)))+geom_histogram()
 ggplot(FieldGraph, aes(x=log1p(Tri.Hydropsychidae)))+geom_histogram()
 
-log1p.FieldCom<-FieldComMat %>% 
+log1p.FieldCom<-F.ComDens %>% 
   select(-FSamID, -Tri.Bracy, -Dip.Chaoboridae, -`FLAT WORMS`, -Entom.Isotomidae,
          -Dip.Culicidae,-Tri.Odontoceridae,-Neu.Sisyridae,-Col.Gyrinidae,
          -Dip.Tupulidae,-Hem.Gerridae, -Col.Hydrophilidae, -Hem.Corixidae,
@@ -129,7 +129,7 @@ log1p.FieldCom<-FieldComMat %>%
          -Ostracoda,-Col.Psephenidae, -Tri.Helicophyche,-Tri.Uenoidae,-Copepoda.miscC,
          -Tri.Molannidae,-InvDensity.npm2, -Dip.Ascillidae) %>% #removing taxa <0.1%
   mutate_if(is.numeric, .funs=log1p)
-log1p.FieldCom20<-FieldComMat %>% #20 most abundant taxa
+log1p.FieldCom20<-F.ComDens %>% #20 most abundant taxa
   select(Dip.ChironomidaeL, Tri.Hydropsychidae, Eph.Trcorythidae, Col.ElmL,
          Oligochaeta.misc, Eph.Heptageniidae, Biv.Corbicula, Dip.ChironomidaeP,
          Tri.Philopteridae, Tri.Hydroptilidae, Cladocera.miscD, Eph.Polymitarcyidae,
@@ -137,17 +137,36 @@ log1p.FieldCom20<-FieldComMat %>% #20 most abundant taxa
          Col.ElmA, Od.Damselflies, Plecoptera.Perlidae, Tri.Polycentropidae) %>% 
   mutate_if(is.numeric, .funs=log1p)
 field.pca<-prcomp(log1p.FieldCom20)
-plot(field.pca, type="l")
-summary(field.pca)
-print(field.pca)
-field.pca$rotation[,1]
+field.pcaL<-prcomp(log1p.FieldCom[,6:40])
+plot(field.pcaL, type="l")
+summary(field.pcaL)
+print(field.pcaL)
+field.pcaL$rotation[,1]
 
-FieldGraph<-FieldGraph %>% mutate(PCA1=field.pca$x[,1],
-                                  PCA2=field.pca$x[,2])
+FieldGraph<-F.ComDens[,1:7] %>% mutate(PCA1=field.pcaL$x[,1],
+                                  PCA2=field.pcaL$x[,2]) %>%
+  left_join(FieldChlA)
+ggplot(FieldGraph, aes(x=WC_CHLA_MG.L, y=PCA1))+
+  geom_point(aes(color=Treatment, shape=Season),size=2)+
+  scale_color_aaas()+theme_krementz()+
+  ylab("PCA1 25% var")+xlab("Water Column ChlA mg/L")
 
+PCAlineF<-data.frame(species=rownames(field.pcaL$rotation),
+                     Scores=field.pcaL$rotation[,2])
+ggplot(PCAlineF)+
+  geom_text(aes(-1,Scores,label=round(Scores,3)))+
+  geom_text(aes(1,Scores, label=species))+
+  geom_vline(xintercept=0)+
+  #scale_y_continuous(trans="log")+
+  coord_cartesian(xlim=c(-3,3))+
+  labs(x=NULL,y=NULL)+theme_classic()
+
+
+library(ggsci)
 ggplot(FieldGraph, aes(x=PCA1, y=PCA2))+
-  geom_point(aes(color=Treatment))+
-  scale_color_futurama()
+  geom_point(aes(color=Treatment, shape=Season),size=2)+
+  scale_color_aaas()+theme_krementz()+
+  xlab("PCA1 25% variance")+ylab("PCA2 14% variance")
 
 ### describe invert density ###
 FCounts<-CountField %>% ungroup() %>%

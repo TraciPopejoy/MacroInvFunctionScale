@@ -5,7 +5,7 @@ FieldSpData<-read_excel("./data/HotSpotLocations.xlsx") %>%
   mutate(Reach=paste(SiteID, Treatment, sep="-")) %>% dplyr::select(-`Drainage - HUC 8`)
 library(sp)
 coordinates(FieldSpData)<-c("Longitude","Latitude")
-plot(FieldSpData)
+plot(FieldSpData, col="white")
 text(FieldSpData, labels=FieldSpData$SiteID)
 
 # HUC12 (or HUC8) for spatial autocorrelation 
@@ -84,7 +84,8 @@ ShellChl<-ShellChl %>% left_join(MDat[,3:4], by="SamID") %>%
 peb.raw<-read_excel("./data/Pebble Counts.xlsx", sheet = "Pebble Counts Reprocessed")
 #install_github("bceaton/GSDtools")
 library(GSDtools)
-peb.wolfman<-peb.raw[,1:3]  %>% rename(Treatment = Reach) %>% mutate(Reach=paste(SiteID, Treatment, sep="-"))
+peb.wolfman<-peb.raw[,1:3]  %>% rename(Treatment = Reach) %>% 
+  mutate(Reach=paste(SiteID, Treatment, sep="-"))
 for(k in 1:nrow(peb.raw)){
   store<-MakeCFD(as.matrix(peb.raw[k,4:104]))
   wolf<-WolmanCI(store, n=100, P=c(10,50,90))
@@ -103,19 +104,11 @@ for(k in 1:nrow(peb.raw)){
 ggplot(store, aes(x=size, y=probs))+geom_point()+geom_line()+
   scale_x_log10(breaks=c(0.1,0.3,1,3,10,30,100))
 
-enc.peb.raw<-read_excel("./data/Enc_pebblecounts.xlsx", sheet = 1) %>% 
-  dplyr::select(-Angle) %>% mutate(Enclosure=substr(Image.Name, 1,2),
-                                   Week=case_when(substr(Image.Name, 3,5)=="Oct"~"w12",
-                                                  substr(Image.Name, 3,5)=="Sep"~"w09"),
-                                   PebSize=Minor.Axis*10) %>%
-  group_by(Image.Name) %>% mutate(peb.n=n())
-enc.wolfman<-data.frame(Image.Name=unique(enc.peb.raw$Image.Name)) %>%
-  mutate(Enclosure=substr(Image.Name, 1,2),
-         Week=case_when(substr(Image.Name, 3,5)=="Oct"~"w12",
-                        substr(Image.Name, 3,5)=="Sep"~"w09"))
-for(p in 1:length(unique(enc.peb.raw$Image.Name))){
-  store<-MakeCFD(as.matrix(enc.peb.raw[enc.peb.raw$Image.Name==unique(enc.peb.raw$Image.Name)[p],8]))
-  wolf<-WolmanCI(store, n=unique(enc.peb.raw$peb.n)[p], P=c(10,50,90))
+peb.enc<-read_excel("./data/Enc_pebbles.xlsx", sheet = "fixed")
+peb.enc.sum<-peb.enc[,1:2]  
+for(k in 1:nrow(peb.enc)){
+  store<-MakeCFD(as.matrix(peb.enc[k,3:27]))
+  wolf<-WolmanCI(store, n=25, P=c(10,50,90))
   sub<-data.frame(D10=wolf[1,2],
                   D10low=wolf[1,3],
                   D10high=wolf[1,4],
@@ -125,8 +118,11 @@ for(p in 1:length(unique(enc.peb.raw$Image.Name))){
                   D90=wolf[3,2],
                   D90low=wolf[3,3],
                   D90high=wolf[3,4])
-  enc.wolfman[p,4:12]<-sub
+  peb.enc.sum[k,3:11]<-sub
 }
+
+peb.ENC.sum<-peb.enc.sum %>% left_join(TreatENC)
+ggplot(peb.ENC.sum, aes(x=TreatA, y=D50))+geom_boxplot()
 
 # Summary =========
 #joined data frames
@@ -137,6 +133,7 @@ Fenv.data<-FieldChlA %>% full_join(FieldDischarge) %>%
          Discharge.cms,HUC8num,HUC12num,D10,D50,D90)
 
 Eenv.data<-EncChlAraw %>% left_join(EncDischarge) %>% 
-  left_join(TreatENC) %>% left_join(enc.wolfman) %>%
+  left_join(TreatENC) %>% left_join(peb.enc.sum) %>%
   select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
          D10, D50, D90)
+

@@ -1,6 +1,6 @@
 # script to get data into correct form 
 # should have four versions - density, percent abundance, biomass, percent biomass
-# dataframes named: ScaleInitial.DataType.Quantification
+# dataframes named: ScaleInitial.DataType.Quantifications
 #  so F.Com.Dens is the field data community matrix in density form (n/m2)
 
 # should also have a treatment table to easily add treatment identifiers
@@ -110,7 +110,7 @@ F.ComPer<-CountField %>% group_by(Reach, SamplingSeason) %>%
 #biomass taxa table has 'misc' for some orders to filter (b/c no regressions for that order)
 FTaxaTable<-read_excel("Macroinv Power Law Coeffs TBP.XLSX", sheet=2)
 #checking to make sure all taxa in taxa table
-which(is.na(match(names(F.ComPer[,-c(1:6,61)]), FTaxaTable$Taxa)))
+which(is.na(match(names(F.ComPer[,-c(1:6,61,62)]), FTaxaTable$Taxa)))
 
 # Field Biomass estimate ==============
 # lengths measured from the surber data
@@ -253,11 +253,14 @@ MusBiomass<-MusselData %>% left_join(TreatENC) %>%
                             Notes=="NotRecovered"&Genus=="ACT"~7.64,
                             Genus=="AMB"~ 1.57e-6*L^3.21,
                             Genus=='ACT'~ 4.7e-7*L^3.51)) %>%
-  group_by(Enc2, Treatment) %>%
+  group_by(Enc2, Treatment, Genus) %>%
   summarize(sumBM=sum(BiomassE, na.rm=T), 
             meanBM=mean(BiomassE,na.rm=T), 
             sdBM=sd(BiomassE, na.rm=T)) %>% replace(is.na(.),0) %>%
-  mutate(MusselBiomass.g.m2=sumBM/0.25)
+  mutate(MusselBiomass.g.m2=sumBM/0.25) %>% 
+  spread(Genus, MusselBiomass.g.m2) %>%
+  select(-sumBM, -meanBM, -sdBM) %>%
+  summarise_all(list(~.[which(!is.na(.))]))
 
 # Enclosure Invertebrates ---------
 #bring in the invert data from basket sampling
@@ -307,8 +310,8 @@ E.ComDens<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   select(-id) %>% replace(is.na(.),0) %>%
   left_join(ECounts) %>% 
   select(-Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2,-sumBM,-meanBM,-sdBM, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
+         -InvertDensity.npm2, -TreatF,-Treatment)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,ACT, AMB, everything())
 
 # enclosure data community matrix in relative abundance; units are %
 E.ComPer<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>% 
@@ -322,8 +325,8 @@ E.ComPer<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   summarise_if(is.numeric,list(~./rowsum)) %>%
   left_join(ECounts) %>% 
   select(-rowsum, -Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2,-sumBM,-meanBM,-sdBM, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
+         -InvertDensity.npm2, -TreatF,-Treatment)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,ACT, AMB, everything())
 
 # Enclosure Biomass ===========
 #head(EnclInv)

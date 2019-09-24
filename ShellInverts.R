@@ -96,29 +96,35 @@ ggplot(ShellGraph, aes(x=MusselBiomass.g.m2,y=Col.ElmL))+
 ggplot(ShellGraph, aes(x=log1p(Dip.ChironomidaeL)))+geom_histogram()
 ggplot(ShellGraph, aes(x=log1p(Tri.Polycentropidae)))+geom_histogram()
 
-log1p.ShellCom<-ShellComMat %>% #taxa >0.1%
+log1p.ShellCom<-S.ComDens %>% #taxa >0.1%
   select(-SamID) %>% replace(is.na(.),0) %>%
   mutate_if(is.numeric, .funs=log1p)
-shell.pca<-prcomp(log1p.ShellCom)
+shell.pca<-prcomp(log1p.ShellCom[,7:39])
 plot(shell.pca, type="l")
 summary(shell.pca)
 print(shell.pca)
 
-ShellGraph<-ShellGraph %>% mutate(PCA1=shell.pca$x[,1],
-                                  PCA2=shell.pca$x[,2])
+ShellGraph<-S.ComDens %>% mutate(PCA1=shell.pca$x[,1],
+                                  PCA2=shell.pca$x[,2]) %>%
+  left_join(ShellChl)
+ShellGraph[ShellGraph$ChlAdensity<0&!is.na(ShellGraph$ChlAdensity),"ChlAdensity"]<-0
 library(ggsci)
 ggplot(ShellGraph, aes(x=PCA1, y=PCA2))+
-  geom_point(aes(color=Treat.Shell))+
-  scale_color_futurama()
-ggplot(ShellGraph, aes(x=MusselBiomass.g.m2, y=PCA2))+
-  geom_point(aes(color=Type))+geom_smooth(method="lm")
+  geom_point(aes(color=SheType),size=2)+
+  scale_color_aaas()+theme_krementz()+
+  xlab("PCA1 72% var")+ylab("PCA2 14% var")
+ggplot(ShellGraph, aes(x=ChlAdensity, y=PCA1))+
+  geom_point(aes(color=SheType), size=2)+
+  xlab("Shell ChlA mg/cm2")+ylab("PCA1 72% var")+
+  scale_color_aaas()+theme_krementz()
 summary(lm(PCA1~MusselBiomass.g.m2*Type, data=ShellGraph))
-PCAline<-data.frame(species=rownames(shell.pca$rotation),Scores=shell.pca$rotation[,2])
+PCAline<-data.frame(species=rownames(shell.pca$rotation),
+                    Scores=shell.pca$rotation[,1])
 ggplot(PCAline)+
   geom_text(aes(-1,Scores,label=round(Scores,3)))+
   geom_text(aes(1,Scores, label=species))+
   geom_vline(xintercept=0)+
-  scale_y_continuous(trans="log")+
+  #scale_y_continuous(trans="log")+
   coord_cartesian(xlim=c(-3,3))+
   labs(x=NULL,y=NULL)+theme_classic()
 

@@ -1,21 +1,32 @@
 source("InvDataframes.R")
 
 F.ComDens16<-F.ComDens %>% filter(SamplingSeason=="Fall2016")
+F.ComDens16 %>% select(-Year, -InvDensity.npm2R) %>% 
+  summarise_if(is.numeric,list(sumT=sum)) %>%
+  gather(variable, value) %>% arrange(desc(value))
 E.ComDens12<-E.ComDens %>% filter(Week=="w12")
+E.ComDens12 %>% ungroup()%>% select(-TEid) %>%
+  summarise_if(is.numeric,list(sumT=sum)) %>%
+  gather(variable, value) %>% arrange(desc(value))
+S.ComDens %>% ungroup()%>% 
+  summarise_if(is.numeric,list(sumT=sum)) %>%
+  gather(variable, value) %>% arrange(desc(value))
+
 # Gamma & Alpha Diversity --------
 
 # Field Data
 #head(F.ComDens)
-sum(colSums(F.ComDens16[,-c(1:7,65)])>1) #gamma diversity?
+sum(colSums(F.ComDens16[,-c(1:7,70:71)])>1) #gamma diversity?
 
-F.Talpha<-data.frame(F.ComDens[,c(1:7)],
-           richness=specnumber(F.ComDens[,-c(1:7, 65)]),
-           SimpsonsI=diversity(F.ComDens[,-c(1:7,65)], "simpson")) %>%
+F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
+           richness=specnumber(F.ComDens16[,-c(1:7, 70:71)]),
+           SimpsonsI=diversity(F.ComDens16[,-c(1:7,70:71)], "simpson")) %>%
   group_by(Reach, SamplingSeason, Treatment, Season, Mussel.g.m2) %>%
   summarize(meanID.npm2=mean(InvDensity.npm2R),
             meanR=mean(richness),
             meanSimp=mean(SimpsonsI)) %>%
-  mutate(TreatFAC=factor(Treatment, levels=c("NM","MR")))
+  mutate(TreatFAC=factor(Treatment, levels=c("NM","MR"))) %>%
+  left_join(FieldSpData@data)
 mean(F.Talpha$meanR);sd(F.Talpha$meanR)
 ggplot(F.Talpha, aes(x=Treatment, y=meanSimp))+
   geom_boxplot(fill="grey")+facet_wrap(~Season)+
@@ -31,12 +42,12 @@ FIn<-ggplot(F.Talpha, aes(x=TreatFAC, y=meanID.npm2))+
 
 #Enclosure Data
 #head(E.ComDens)
-sum(colSums(E.ComDens12[,-c(1:8)])>1) #gamma diversity?
+sum(colSums(E.ComDens12[,-c(1:9)])>1) #gamma diversity?
 
 E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
-                     InvDensity.npm2=rowSums(E.ComDens12[,-c(1:8)]),
-                     richness=specnumber(E.ComDens12[,-c(1:8)]),
-                     SimpsonsI=diversity(E.ComDens12[,-c(1:8)], "simpson"),
+                     InvDensity.npm2=rowSums(E.ComDens12[,-c(1:9)]),
+                     richness=specnumber(E.ComDens12[,-c(1:9)]),
+                     SimpsonsI=diversity(E.ComDens12[,-c(1:9)], "simpson"),
                      TreatFAC=factor(E.ComDens12$TreatA, 
                                     levels=c("CTRL","ACTL","ACTS","AMBL","AMBS"),
                                     labels=c("Control",
@@ -45,15 +56,14 @@ E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
                                              'Amblema\nLive',
                                              'Amblema\nSham')))
 ggplot(E.Talpha, aes(x=TreatA, y=SimpsonsI))+
-  geom_boxplot(fill="grey")+facet_wrap(~Week)+theme_krementz()
+  geom_boxplot(fill="grey")#+facet_wrap(~Week)
 ggplot(E.Talpha, aes(x=TreatA, y=richness))+
-  geom_boxplot(fill="grey")+facet_wrap(~Week)+theme_krementz()
+  geom_boxplot(fill="grey")#+facet_wrap(~Week)
 EIn<-ggplot(E.Talpha, aes(x=TreatFAC, y=InvDensity.npm2))+
   geom_boxplot(fill="grey")+
   scale_y_log10(name=expression("Invertebrate # m "^-2))+
   scale_x_discrete(name="Treatment")+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
-
 
 #Shell Data
 #head(E.ComDens)
@@ -65,9 +75,9 @@ S.Talpha<-data.frame(S.ComDens[,c(1:7)],
                      SimpsonsI=diversity(S.ComDens[,-c(1:7)], "simpson")) %>%
   left_join(ShellChl)
 ggplot(S.Talpha, aes(x=TreatA, y=SimpsonsI))+
-  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")+theme_krementz()
+  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")
 ggplot(S.Talpha, aes(x=TreatA, y=richness))+
-  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")+theme_krementz()
+  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")
 SIn<-ggplot(S.Talpha, aes(x=SheType, y=InvDensity.npcm2*10000))+
   geom_boxplot(fill="grey")+
   scale_y_log10(name=expression("Invertebrate # m "^-2),)+
@@ -80,44 +90,193 @@ ggsave("./Figures/AbundTreat.tiff",width=10, height=4)
 
 FIbm<-ggplot(F.Talpha, aes(x=Mussel.g.m2, y=meanID.npm2))+
   geom_point()+
-  geom_smooth(method="lm",color="black", linetype="dashed")+
+  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
+              alpha=0.5)+
   scale_y_log10(name=expression("Invertebrates # m "^-2))+
   scale_x_continuous(trans="log1p", breaks=c(0,5,10,50,200),
                     name=expression("Mussel biomass g m "^-2))
-EIbm<-ggplot(E.Talpha, aes(x=MusselBiomass.g.m2, y=InvDensity.npm2))+
-  geom_point()+
-  geom_smooth(method="lm",color="black", linetype="dashed")+
-  scale_y_log10(name=expression("Invertebrates # m "^-2))+
-  scale_x_continuous(trans="log1p", breaks=c(0,5,10,50,150,300),
-                     name=expression("Mussel biomass g m "^-2))
+# from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
+library(scales)
+squish_trans <- function(from, to, factor) {
+  
+  trans <- function(x) {
+    
+    # get indices for the relevant regions
+    isq <- x > from & x < to
+    ito <- x >= to
+    
+    # apply transformation
+    x[isq] <- from + (x[isq] - from)/factor
+    x[ito] <- from + (to - from)/factor + (x[ito] - to)
+    
+    return(x)
+  }
+  inv <- function(x) {
+    
+    # get indices for the relevant regions
+    isq <- x > from & x < from + (to - from)/factor
+    ito <- x >= from + (to - from)/factor
+    
+    # apply transformation
+    x[isq] <- from + (x[isq] - from) * factor
+    x[ito] <- to + (x[ito] - (from + (to - from)/factor))
+    
+    return(x)
+  }
+  
+  # return the transformation
+  return(trans_new("squished", trans, inv))
+}
+
+library(ggsci)
+EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",], 
+              aes(x=ACT+AMB, y=InvDensity.npm2))+
+  geom_point(size=2, aes(shape=TreatFAC, fill=TreatFAC))+
+  stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",], 
+               aes(x=ACT+AMB, y=InvDensity.npm2, shape=TreatFAC, fill=TreatFAC))+
+  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
+              alpha=0.5)+
+  scale_y_log10(name=expression("Invertebrates # m "^-2),
+                breaks=c(1, 750, 1000,1500, 2000, 3000,4000))+
+  scale_x_continuous(trans = squish_trans(2,140,4),
+                     breaks=c(0,150,200,250,300),
+                     name=expression("Mussel biomass g m "^-2))+
+  scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
+  scale_fill_manual(name="Treatment",
+                     values=c("darkgrey","darkgrey","white","white","black"))+
+  theme(legend.position="none")
+
 SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
-  geom_point()+
-  geom_smooth(method="lm",color="black", linetype="dashed")+
-  scale_y_log10(name=expression("Invertebrates # m "^-2))+
+  geom_point(size=2,aes(shape=SheType, fill=SheType))+
+  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
+              alpha=0.5)+
+  scale_y_log10(name=expression("Invertebrates # m "^-2),
+                breaks=c(50,100,150,300,500,1000))+
   scale_x_continuous(trans="log1p", breaks=c(500,1000,1500,2500),
-                     name=expression("Shell Area sampled cm "^2))
-plot_grid(FIbm, EIbm, SIbm, nrow = 1, labels="AUTO")
+                     name=expression("Shell Area sampled cm "^2))+
+  scale_shape_manual(name="Shell Type",values=c(23,24,24,23),
+                     guide=F)+
+  scale_fill_manual(name="Shell Type", 
+                    values=c("darkgrey","darkgrey","white","white"),
+                    guide=F)
+legendBM<-get_legend(EIbm+
+                      theme(legend.position = c(.25,.6),
+                            legend.direction = "horizontal"))
+bmplots<-plot_grid(FIbm, EIbm, SIbm, nrow = 1, labels="AUTO")
+plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
 ggsave("./Figures/MussAbund.tiff",width=10, height=4)
+
+##### Taxonomic Diversity Tests #####
+#Field - need to use a mixed model to account for space
+library(lme4);library(lmerTest)
+finv<-lmer(log10(meanID.npm2)~Mussel.g.m2+(1|HUC12), data=F.Talpha)
+summary(finv)
+hist(residuals(finv),col="darkgrey") #approximates normal
+plot(fitted(finv), residuals(finv))  #approximates heteroskodastity
+qqnorm(resid(finv));qqline(resid(finv))
+
+fric<-lmer(log(meanR)~Mussel.g.m2+(1|HUC12), data=F.Talpha)
+summary(fric)
+hist(residuals(fric),col="darkgrey") #approximates normal
+plot(fitted(fric), residuals(fric)) 
+qqnorm(resid(fric));qqline(resid(fric))
+mean(F.Talpha$meanR);sd(F.Talpha$meanR)
+
+fsim<-lmer(meanSimp~Mussel.g.m2+(1|HUC12), data=F.Talpha)
+summary(fsim)
+hist(residuals(fsim),col="darkgrey") #approximates normal
+plot(fitted(fsim), residuals(fsim)) 
+qqnorm(resid(fsim));qqline(resid(fsim))
+mean(F.Talpha$meanSimp);sd(F.Talpha$meanSimp)
+
+#Enclosure - same problem - how to account for that weird control treatment
+einv<-aov(log10(InvDensity.npm2)~TreatA, data=E.Talpha)
+summary(einv)
+plot(einv, 1) #Homogeneity of variances
+library(car)
+leveneTest(log10(InvDensity.npm2) ~ TreatA, data = E.Talpha)
+plot(einv,2) #normality
+aov_residuals <- residuals(object = einv )
+shapiro.test(x = aov_residuals ) #not normal, should remove 38, 41, and 9?
+
+eric<-aov(log(richness)~TreatA, data=E.Talpha)
+summary(eric)
+plot(eric, 1) #Homogeneity of variances
+leveneTest(log(richness) ~ TreatA, data = E.Talpha)
+plot(eric,2) #normality
+aov_residuals <- residuals(object = eric )
+shapiro.test(x = aov_residuals ) 
+mean(E.Talpha$richness);sd(E.Talpha$richness)
+
+esim<-aov(SimpsonsI~TreatA, data=E.Talpha)
+summary(esim)
+plot(esim, 1) #Homogeneity of variances
+leveneTest(SimpsonsI ~ TreatA, data = E.Talpha)
+plot(esim,2) #normality
+aov_residuals <- residuals(object = esim )
+shapiro.test(x = aov_residuals ) 
+mean(E.Talpha$SimpsonsI);sd(E.Talpha$SimpsonsI)
+E.Talpha %>% group_by(Type) %>% summarize(meanS=mean(SimpsonsI),
+                                          sdS=sd(SimpsonsI))
+
+#Shell - 
+sinv<-aov(InvDensity.npcm2~ShellSpecies*Type, data=S.Talpha)
+summary(sinv)
+plot(sinv, 1) #Homogeneity of variances
+leveneTest(log10(InvDensity.npcm2) ~ TreatA, data = S.Talpha)
+plot(sinv,2) #normality
+aov_residuals <- residuals(object = sinv )
+shapiro.test(x = aov_residuals ) 
+library(emmeans)
+sinvT<-emmeans(sinv,~ShellSpecies|Type) #object contains contrasts & sig
+CLD(sinvT, alpha=.05, Letters=letters) #letters on dif groups
+
+sric<-aov(richness~ShellSpecies*Type, data=S.Talpha)
+summary(sric)
+plot(sric, 1) #Homogeneity of variances
+leveneTest(log(richness) ~ TreatA, data = S.Talpha)
+plot(sric,2) #normality
+aov_residuals <- residuals(object = sric )
+shapiro.test(x = aov_residuals ) 
+mean(S.Talpha$richness);sd(S.Talpha$richness)
+
+ssim<-aov(SimpsonsI~ShellSpecies*Type, data=S.Talpha)
+summary(ssim)
+plot(ssim, 1) #Homogeneity of variances
+leveneTest(SimpsonsI~ TreatA, data = S.Talpha)
+plot(ssim,2) #normality
+aov_residuals <- residuals(object = ssim )
+shapiro.test(x = aov_residuals ) #not normal, made worse by transformation
+mean(S.Talpha$SimpsonsI);sd(S.Talpha$SimpsonsI)
 
 #Table1
 F.TalphaS<-F.Talpha %>% group_by(Treatment,SamplingSeason) %>%
   summarize(meanRt=mean(meanR),
             sdR=sd(meanR),
             meanIDt.npm2=mean(meanID.npm2),
-            sdID=sd(meanID.npm2, na.rm=T))
+            sdID=sd(meanID.npm2, na.rm=T),
+            meanS=mean(meanSimp),
+            sdS=sd(meanSimp))
 E.TalphaS<-E.Talpha %>% group_by(TreatA,Week) %>%
   summarize(meanRt=mean(richness),
             sdR=sd(richness),
             meanIDt.npm2=mean(InvDensity.npm2),
             sdID=sd(InvDensity.npm2, na.rm=T),
-            meanMBM=mean(MusselBiomass.g.m2))
+            meanS=mean(SimpsonsI),
+            sdS=sd(SimpsonsI),
+            meanMBM=mean(ACT+AMB))
 S.TalphaS<-S.Talpha %>% group_by(TreatA,ShellSpecies) %>%
   summarize(meanRt=mean(richness),
             sdR=sd(richness),
             meanIDt.npm2=mean(InvDensity.npcm2)*10000,
-            sdID=sd(InvDensity.npcm2, na.rm=T)*10000)
+            sdID=sd(InvDensity.npcm2, na.rm=T)*10000,
+            meanS=mean(SimpsonsI),
+            sdS=sd(SimpsonsI),
+            meanTShell=mean(TShellSurArea.cm2))
 tab1<-rbind(F.TalphaS, E.TalphaS, S.TalphaS)
 write.csv(tab1, "Table1.InvertBasics.csv")
+
+
 
 # Beta Diversity ---------
 
