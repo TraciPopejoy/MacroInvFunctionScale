@@ -1,59 +1,57 @@
 #CCA
 
-# to do:
-# remove FFG from image
-# figure out correct interpretation of % variation
-# write results
-
 ##### Field #####
 #Hypothesis: hydrology/temperature drives community structure
 #predict: discharge & season will explain more variation than mussels
 # mussels should be correlated with discharge though
 
 # which taxa to remove because rare
-#47 samples, 3% samples is 1.4
-#so removing taxa only found in 2 samples
-F.ComDens[,-c(1:7)] %>% gather(taxa,den) %>% filter(den!=0) %>%
+#14 samples, 3% samples is 1.4
+#so removing taxa only found in 1 samples
+F.ComDens[,-c(1:7)] %>% filter(SampSeaF=="Fall2016") %>%
+  gather(taxa,den) %>% filter(den!=0) %>%
   group_by(taxa) %>% tally() %>% arrange(n)
 
 #only including Fall data to avoid psuedoreplication
 CCAField.data<-F.ComDens %>% left_join(Fenv.data) %>% 
   filter(SamplingSeason=="Fall2016") %>%
-  dplyr::select(-Hymenoptera.miscH,-Dip.Ascillidae,-Dip.Chaoboridae, #only 1
-                -Dip.Thaumaleidae,-Hem.Corixidae, -Hem.Gerridae,-Hydrozoans.miscH,
-                -Tri.Odontoceridae, #only in 2 samples
+  dplyr::select(-Hymenoptera.miscH,-Dip.Ascillidae, -Hem.Corixidae,#not in dataset
+                -Hem.Gerridae,-Hydrozoans.miscH,
+                -Dip.Chaoboridae,#only in 1
+                -Dip.Orthorrhaphous, -Dip.Thaumaleidae, -Lep.Pyralidae, #only in 1
+                #-Neu.Sisyridae,-Col.Hydrophilidae,-Dip.Tupulidae, #only in 2
+                #-Tri.Odontoceridae, -`FLAT WORMS`, #only in 2 samples
                 -Biv.Unionidae, #don't care about these
                 -Entom.Isotomidae, -Other.other,-Isopoda.miscI) #terrestrials 
 CCAField.data$Mussel.g.m2<-replace_na(CCAField.data$Mussel.g.m2,0)
 #View(CCAField.data) #check it matches environment
 
-names(CCAField.data[,-c(1:7,58:67)]) #identifying inverts
+names(CCAField.data[,-c(1:7, 57:66)]) #identifying inverts
 #partial cca that takes the site affect out (using HUC12num)
 
 # isolate community data and DONT transform bc cca usines chisquare
-field.com<-CCAField.data[,-c(1:7, 58:67)] 
+field.com<-CCAField.data[,-c(1:7, 57:66)] 
 # isolate environmental variables and scale to z scores
-field.env<-CCAField.data[,c(1:7, 60:67)] %>% mutate_if(is.numeric,scale)
+field.env<-CCAField.data[,c(1:7, 57:66)] %>% mutate_if(is.numeric,scale)
 
 cca.F<-cca(field.com~Mussel.g.m2+Benthic_CHLA_MG.M2+
-             Discharge.cms+D50+Condition(HUC12num), field.env, scaling=2)
+             Discharge.cms+Dvar+Condition(HUC12num), field.env, scaling=2)
 
 cca.F
+vif.cca(cca.F) # values over 10 mean redundant measures
 ccaF.plot<-plot(cca.F)
 cca.F.sum<-summary(cca.F)
 #str(cca.F.sum)
 sort(cca.F.sum$biplot[,1])
 sort(cca.F.sum$biplot[,2])
 #how much variation each CCA contributes to constraint variation explained
-CCAF.impsp<-data.frame(CCA1.high=as.character(names(sort(cca.F.sum$species[,1],decreasing=T)[1:4])),
-              CCA1.low=as.character(names(sort(cca.F.sum$species[,1], decreasing=F)[1:4])),
-              CCA2.high=as.character(names(sort(cca.F.sum$species[,2],decreasing=T)[1:4])),
-              CCA2.low=as.character(names(sort(cca.F.sum$species[,2], decreasing=F)[1:4])))
+CCAF.impsp<-data.frame(CCA1.high=as.character(names(sort(cca.F.sum$species[,1],decreasing=T)[1:3])),
+              CCA1.low=as.character(names(sort(cca.F.sum$species[,1], decreasing=F)[1:3])),
+              CCA2.high=as.character(names(sort(cca.F.sum$species[,2],decreasing=T)[1:3])),
+              CCA2.low=as.character(names(sort(cca.F.sum$species[,2], decreasing=F)[1:3])))
 cca.F.sum$concont
 cca.F.sum$constr.chi/cca.F.sum$tot.chi*100
 
-vif.cca(cca.F)
-# values over 10 mean redundant measures
 cca.F0<-cca(field.com~1+Condition(HUC12num), field.env, scaling=2)
 anova(cca.F) #if the global model is significant, can do forward model selection
 finalF<-ordistep(cca.F0,scope=formula(cca.F), direction="forward")
@@ -62,37 +60,55 @@ finalF$anova
 ###### Enclosure #####
 #Hypothesis: Mussels biomass drives com structure, but little difference between sp
 #Predict: MusselBM explains most variation, followed by chlA abun
+
+# which taxa to remove because rare
+#50 samples, 4% samples is 2
+#so removing taxa only found in 2 samples
+tax<-E.ComDens[,-c(1,2,4:8)] %>% filter(Week=="w12") %>%
+  gather(taxa,den) %>% filter(den!=0) %>%
+  group_by(taxa) %>% tally() %>% arrange(n)
+
 CCAEnc.data<-E.ComDens %>% left_join(Eenv.data)%>% 
+  left_join(MusBioG)%>%
+  dplyr::select(-Col.Myst, -Col.Gyrinidae,-Dip.Ceratopogonidae,
+                -Tri.Pupa, -MysteryTricoptera,#not in data
+                -Col.Hydrophilidae, -Col.Staphylinidae,#only in 1
+                -Eph.Baetidae, -Gas.Physidae, -Gas.Planorbidae,
+                -Hemiptera, -Ostracoda,#only in 1
+                -Sisyridae, -Eph.Myst, #only in 2
+                -Entom.Isotomidae,-Isopoda.miscI,#terrestrials 
+                -Treatment) %>% 
   filter(!is.na(ChlAdensity)) %>%
-  filter(Week=="w12") %>% dplyr::select(-Entom.Isotomidae,
-                                        -Isopoda.miscI) %>%
-  mutate(TMusBM=ACT+AMB)
+  filter(Week=="w12")
+CCAEnc.data[is.na(CCAEnc.data$ACT),46:47]<-0
+CCAEnc.data <- CCAEnc.data %>%  mutate(TMusBM=ACT+AMB)
 CCAEnc.data[!is.na(CCAEnc.data$ChlAdensity) &
               CCAEnc.data$ChlAdensity<=0,"ChlAdensity"]<-0
 
-names(CCAEnc.data[,-c(1:9,56:61)])
+names(CCAEnc.data[,-c(1:8,41:48)])
 # isolate community data and NOT transform bc cca uses chisquare dist
-enc.com<-CCAEnc.data[,-c(1:9, 56:61)] 
+enc.com<-CCAEnc.data[,-c(1:8, 41:48)] 
 # isolate environmental variables and scale to z scores
-enc.env<-CCAEnc.data[,c(1:9, 56:61)] %>% ungroup()%>% mutate_if(is.numeric,scale)
+enc.env<-CCAEnc.data[,c(1:8, 41:48)] %>% ungroup()%>% mutate_if(is.numeric,scale) %>% 
+  mutate(Live=case_when(Type=="Control"~"No",
+                        Type=="Sham"~"No",
+                        Type=="Live"~"Yes"))
 
 ##### note: have total mussel biomass but it is redundant with treatment factors
-cca.E<-cca(enc.com~ACT+AMB+Type+
-             Discharge.cms+ChlAdensity+D50, enc.env, scaling=2)
+cca.E<-cca(enc.com~ACT+AMB+Live+
+             Discharge.cms+ChlAdensity+Dvar, enc.env, scaling=2)
 vif.cca(cca.E)
-drop1(cca.E, test="perm")#which is least informative constraint
+#drop1(cca.E, test="perm")#which is least informative constraint
 cca.E
 ccaE.plot<-plot(cca.E)
 cca.E.sum<-summary(cca.E)
 #str(cca.F.sum)
 sort(cca.E.sum$biplot[,1]) #loadings on CCA1
 #how much variation each CCA contributes to constraint variation explained
-CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[1:4]),
-                       CCA1.low=names(sort(cca.E.sum$species[,1], decreasing=F)[1:4]),
-                       CCA2.high=names(sort(cca.E.sum$species[,2],decreasing=T)[1:4]),
-                       CCA2.low=names(sort(cca.E.sum$species[,2], decreasing=F)[1:4]))
-cca.E.sum$concont
-#porportion explained by constraints
+CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[1:3]),
+                       CCA1.low=names(sort(cca.E.sum$species[,1], decreasing=F)[1:3]),
+                       CCA2.high=names(sort(cca.E.sum$species[,2],decreasing=T)[1:3]),
+                       CCA2.low=names(sort(cca.E.sum$species[,2], decreasing=F)[1:3]))
 cca.E.sum$constr.chi/cca.E.sum$tot.chi*100
 
 anova(cca.E, perm=1000)
@@ -102,13 +118,17 @@ anova(cca.E, perm=1000)
 #            in habitat area and chlA abundance
 #Predict: ChlA matters most, and is highly correlated with Live/Sham 
 
-###### to do - switch fr
+#5% is 1.6
+S.ComDens[,-c(1:7)] %>%
+  gather(taxa,den) %>% filter(den!=0) %>%
+  group_by(taxa) %>% tally() %>% arrange(n)
+
 CCAS.data<-S.ComDens %>% 
   left_join(EncDischarge[EncDischarge$Week=="w12",]) %>% 
   left_join(ShellChl) %>% dplyr::select(-Dip.Adult,
                                         -Orthoptera,
                                         -Entom.Isotomidae) %>% 
-  left_join(ECounts[,-c(4:12)]) %>%
+  #left_join(ECounts[,-c(4:16)]) %>%
   filter(!is.na(ChlAdensity))
 CCAS.data[!is.na(CCAS.data$ChlAdensity) &
               CCAS.data$ChlAdensity<=0,"ChlAdensity"]<-0
@@ -125,10 +145,10 @@ ccaS.plot<-plot(cca.S)
 cca.S.sum<-summary(cca.S)
 sort(cca.S.sum$biplot[,1]) #loadings on CCA1
 sort(cca.S.sum$biplot[,2])
-CCAS.impsp<-data.frame(CCA1.high=names(sort(cca.S.sum$species[,1],decreasing=T)[1:4]),
-              CCA1.low=names(sort(cca.S.sum$species[,1], decreasing=F)[1:4]),
-              CCA2.high=names(sort(cca.S.sum$species[,2],decreasing=T)[1:4]),
-              CCA2.low=names(sort(cca.S.sum$species[,2], decreasing=F)[1:4]))
+CCAS.impsp<-data.frame(CCA1.high=names(sort(cca.S.sum$species[,1],decreasing=T)[1:3]),
+              CCA1.low=names(sort(cca.S.sum$species[,1], decreasing=F)[1:3]),
+              CCA2.high=names(sort(cca.S.sum$species[,2],decreasing=T)[1:3]),
+              CCA2.low=names(sort(cca.S.sum$species[,2], decreasing=F)[1:3]))
 #how much variation each CCA contributes to constraint variation explained
 cca.S.sum$concont
 #porportion explained by constraints
@@ -141,7 +161,7 @@ finalS$anova
 ##### Plots #####
 #install.packages("devtools")
 #devtools::install_github("gavinsimpson/ggvegan")
-library(ggvegan)
+library(ggvegan); library(ggrepel)
 # Field Plot
 #autoplot(cca.F)
 tidy.ccaF<-fortify(cca.F)
@@ -152,96 +172,97 @@ tidy.ccaFSi<-tidy.ccaF %>% filter(Score=="sites") %>% cbind(field.env[,c(2,4)])
 tidy.ccaFcon<-tidy.ccaF %>% filter(Score!="species",
                                    Score!="sites",
                                    Score!="constraints")%>%
-  mutate(LabelG=c("MusselBM","Benthic Chl.","Discharge","Substrate"))
-
-names(tidy.ccaF)
+  mutate(Tlabel=c("MusselBM","Benthic Chl.","Discharge","Substrate"))
+frep<-rbind(tidy.ccaFspespe[c(1:8,12)],tidy.ccaFcon)
+  
 FieldCCA<-ggplot()+
-  geom_point(data=tidy.ccaFSi, aes(x=CCA1,y=CCA2, #label=Reach, 
-                                   shape=Treatment))+
-  geom_text(data=tidy.ccaFspespe, aes(x=CCA1,y=CCA2, 
-                                  label=Tlabel), size=2.8) +
-  geom_text(data = tidy.ccaFcon[tidy.ccaFcon$Score=="biplot" & 
-                                  tidy.ccaFcon$LabelG!="Season",],
-            aes(x=CCA1, y=CCA2, label=LabelG), color = "red")+
+  #geom_point(data=tidy.ccaFSi, aes(x=CCA1,y=CCA2, #label=Reach, 
+  #                                 shape=Treatment))+
+  geom_point(data=tidy.ccaFSp, aes(x=CCA1, y=CCA2), color="grey")+
+  geom_point(data=tidy.ccaFspespe, aes(x=CCA1,y=CCA2)) +
+  geom_text_repel(data=frep, aes(x=CCA1,y=CCA2, 
+                                  label=Tlabel, color=Score, size=Score))+
   geom_segment(data = tidy.ccaFcon[tidy.ccaFcon$Score=="biplot",],
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
                arrow = arrow(length = unit(0.0, "cm")), alpha=.7)+
-  scale_x_continuous(name="CCA 1 : 33.9% variance")+
-  scale_y_continuous(name="CCA 2 : 11.2% variance") +
-  scale_color_brewer(palette = "Dark2", name="FFG") +
+  geom_text(aes(x=1, y=1, label="Field"), size=5)+
+  scale_x_continuous(name="CCA 1 : 35.7%")+
+  scale_y_continuous(name="CCA 2 : 10.6%") +
+  scale_color_manual(values=c("red","black")) +
+  scale_size_manual(values=c(3.5,2.8))+
   theme(legend.position = "none")
 
 # Enclosure Plot
 #autoplot(cca.E)
 tidy.ccaE<-fortify(cca.E)
-tidy.ccaESp<-tidy.ccaE %>% filter(Score=="species",
+tidy.ccaESp<-tidy.ccaE %>% filter(Score=="species") %>%
+  left_join(FTaxaTable, by=c('Label'='Taxa'))
+tidy.ccaEspespe<-tidy.ccaE %>% filter(Score=="species",
                                   Label %in% unique(c(t(CCAE.impsp)))) %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
-tidy.ccaESi<-tidy.ccaE %>% filter(Score=="sites")
+tidy.ccaESi<-tidy.ccaE %>% filter(Score=="sites") %>% cbind(enc.env[,c(2,4)])
 tidy.ccaEcon<-tidy.ccaE %>% filter(Score!="species",
                                    Score!="sites",
                                    Score!="constraints")%>%
-  mutate(LabelG=c("ActBM","AmbBM","Live","Sham","Discharge","ChlA",
-                  "substrate", "Control","Live","Sham"))
+  mutate(Tlabel=c("ActBM","AmbBM","Alive","Discharge","ChlA",
+                  "substrate","Not Alive","Alive"))
     #"ACTS","AMBL","AMBS","CTRL","Discharge","ChlA","Substrate","ACTL",
     #              "ACTS","AMBL","AMBS","CTRL"))
-
+erep<-rbind(tidy.ccaEspespe[c(1:8,12)],tidy.ccaEcon) %>%
+  filter(Score!="biplot" | Tlabel!="Alive")
 
 EncCCA<-ggplot()+
-  geom_text(data=tidy.ccaESp, aes(x=CCA1,y=CCA2, 
-                                  label=Tlabel), size=2.8) +
+  geom_point(data=tidy.ccaESp, aes(x=CCA1, y=CCA2), color="grey")+
+  geom_point(data=tidy.ccaEspespe, aes(x=CCA1,y=CCA2)) +
+  #geom_point(data=tidy.ccaESi, aes(x=CCA1, y=CCA2, shape=TreatA))+
+  geom_text_repel(data=erep, aes(x=CCA1,y=CCA2, label=Tlabel,
+                                 color=Score, size=Score)) +
   geom_segment(data = tidy.ccaEcon[tidy.ccaEcon$Score=="biplot",],
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
                arrow = arrow(length = unit(0.0, "cm")))+
-  geom_text(data = tidy.ccaEcon[tidy.ccaEcon$Score=="biplot"& 
-                                  tidy.ccaEcon$LabelG!="Live"& 
-                                  tidy.ccaEcon$LabelG!="Sham",],
-            aes(x=CCA1, y=CCA2, label=LabelG), color = "red")+
-  geom_text(data = tidy.ccaEcon[tidy.ccaEcon$Score=="centroids",],
-            aes(x=CCA1, y=CCA2, label=LabelG), color = "navy")+
-  scale_x_continuous(name="CCA 1 : 4.0% variance")+
-  scale_y_continuous(name="CCA 2 : 2.8% variance")+
-  scale_color_brewer(palette = "Dark2", name="FFG", guide=F)
+  scale_x_continuous(name="CCA 1 : 5.3%")+
+  scale_y_continuous(name="CCA 2 : 3.0%")+
+  scale_color_manual(values=c("red","navy","black"), guide=F) +
+  scale_size_manual(values=c(4,4,2.8), guide=F)
 
 #Shell Plot
 #autoplot(cca.S)
 tidy.ccaS<-fortify(cca.S)
-tidy.ccaSSp<-tidy.ccaS %>% filter(Score=="species",
+tidy.ccaSSp<-tidy.ccaS %>% filter(Score=="species") %>%
+  left_join(FTaxaTable, by=c('Label'='Taxa'))
+tidy.ccaSspespe<-tidy.ccaS %>% filter(Score=="species",
                                   Label %in% unique(c(t(CCAS.impsp)))) %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
 tidy.ccaSSi<-tidy.ccaS %>% filter(Score=="sites")
 tidy.ccaScon<-tidy.ccaS %>% filter(Score!="species",
                                    Score!="sites",
                                    Score!="constraints") %>%
-  mutate(LabelG=c("Amblema","Sham","ChlA",
+  mutate(Tlabel=c("Amblema","Sham","ChlA",
                   "Actinonaias","Amblema","Live","Sham"))
+srep<-rbind(tidy.ccaSspespe[,c(1:8,12)], tidy.ccaScon) %>%
+  filter(Score!="biplot" | Tlabel=="ChlA")
 
 shellCCA<-ggplot()+
-  #geom_point(data=tidy.ccaSSi, aes(x=CCA1,y=CCA2))+
-  geom_text(data=tidy.ccaSSp, aes(x=CCA1,y=CCA2, 
-                                  label=Tlabel), size=2.8) +
+  geom_point(data=tidy.ccaSSp, aes(x=CCA1, y=CCA2), color="grey")+
+  geom_point(data=tidy.ccaSspespe, aes(x=CCA1,y=CCA2)) +
+  geom_text_repel(data=srep, aes(x=CCA1,y=CCA2, label=Tlabel,
+                               size=Score, color=Score)) +
   geom_segment(data = tidy.ccaScon[tidy.ccaScon$Score=="biplot",],
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
                arrow = arrow(length = unit(0.0, "cm")))+
-  geom_text(data = tidy.ccaScon[tidy.ccaScon$Score=="biplot" &
-                                tidy.ccaScon$LabelG=="Discharge" |
-                                tidy.ccaScon$LabelG=="ChlA",],
-            aes(x=CCA1, y=CCA2, label=LabelG), color = "red",
-            position=position_dodge(width=.1))+
-  geom_text(data = tidy.ccaScon[tidy.ccaScon$Score=="centroids",],
-          aes(x=CCA1, y=CCA2, label=LabelG), color = "navy",
-          position=position_dodge(width=.1))+
-  scale_x_continuous(name="CCA 1 : 8.8% variance")+
-  scale_y_continuous(name="CCA 2 : 4.9% variance")+
-  scale_color_brewer(palette = "Dark2", name="FFG", guide=F)
+  scale_x_continuous(name="CCA 1 : 6.9%")+
+  scale_y_continuous(name="CCA 2 : 4.8%")+
+  scale_color_manual(values=c("red","navy","black"), guide=F) +
+  scale_size_manual(values=c(4,4,2.8), guide=F)
 
 library(cowplot)
-ffgplot<-plot_grid(FieldCCA, EncCCA, shellCCA, nrow=1, labels="AUTO")
+ccaplot<-plot_grid(FieldCCA, EncCCA, shellCCA, nrow=1, labels="AUTO")
+ggsave("./Figures/CCAplotsLabN.tiff", ccaplot, width=10, heigh=3.5)
 legend1<-get_legend(FieldCCA+
                       theme(legend.position = c(.1,.9),
                             legend.direction = "horizontal"))
 plot_grid(ffgplot,legend1, nrow=2, rel_heights = c(1,.1))
-ggsave("./Figures/CCAplotsG.tiff", width=10, height=4)
+ggsave("./Figures/CCAplotsG.tiff", width=11, height=4)
 
 
 

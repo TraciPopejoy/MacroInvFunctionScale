@@ -71,7 +71,7 @@ fieldSiteKey<-fieldSiteKeyA %>% left_join(FieldBMest, by=c("Reach","Treatment"))
                         SamplingSeason=="Summer2016" |
                         SamplingSeason=="Fall2016"~2016))
 fieldSiteKey[fieldSiteKey$Reach=="K7-NM",c(8:10)]<-0
-which(is.na(fieldSiteKey), arr.ind = T)
+#which(is.na(fieldSiteKey), arr.ind = T)
 #fieldSiteKey is a good 'treatment' dataframe
 
 #field data community matrix in density; units are n/m2
@@ -257,10 +257,13 @@ MusBiomass<-MusselData %>% left_join(TreatENC) %>%
   summarize(sumBM=sum(BiomassE, na.rm=T), 
             meanBM=mean(BiomassE,na.rm=T), 
             sdBM=sd(BiomassE, na.rm=T)) %>% replace(is.na(.),0) %>%
-  mutate(MusselBiomass.g.m2=sumBM/0.25) %>% 
+  mutate(MusselBiomass.g.m2=sumBM/0.25)
+MusBioG<-MusBiomass %>% 
   spread(Genus, MusselBiomass.g.m2) %>%
   select(-sumBM, -meanBM, -sdBM) %>%
   summarise_all(list(~.[which(!is.na(.))]))
+MusBioS<-MusBiomass %>% ungroup() %>% group_by(Enc2) %>%
+  summarise(sumBMall.g.m2=sum(sumBM)/0.25)
 
 # Enclosure Invertebrates ---------
 #bring in the invert data from basket sampling
@@ -296,7 +299,7 @@ ECounts<-EnclInv %>% group_by(TEid, Enc, Week) %>%
   mutate(AreaSamp=(Basket.*.03315),
          InvertDensity.npm2=Nsam/AreaSamp) %>% 
   full_join(TreatENC) %>% 
-  left_join(MusBiomass) %>%
+  left_join(MusBioS) %>%
   replace(is.na(.),0)
 
 # enclosure data community matrix in density; units are n/m2
@@ -310,8 +313,8 @@ E.ComDens<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   select(-id) %>% replace(is.na(.),0) %>%
   left_join(ECounts) %>% 
   select(-Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,ACT, AMB, everything())
+         -InvertDensity.npm2, -TreatF)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,sumBMall.g.m2, everything())
 
 # enclosure data community matrix in relative abundance; units are %
 E.ComPer<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>% 
@@ -325,8 +328,8 @@ E.ComPer<-EnclInv %>% group_by(TEid,Enc, Week, Taxa) %>%
   summarise_if(is.numeric,list(~./rowsum)) %>%
   left_join(ECounts) %>% 
   select(-rowsum, -Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,ACT, AMB, everything())
+         -InvertDensity.npm2, -TreatF)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,sumBMall.g.m2, everything())
 
 # Enclosure Biomass ===========
 #head(EnclInv)
@@ -343,8 +346,8 @@ E.BioDens<- EBiomass %>% group_by(TEid, Taxa) %>%
   spread(Taxa, BM.mg.m2) %>%
   left_join(ECounts) %>% 
   select(-Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2,-sumBM,-meanBM,-sdBM, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
+         -InvertDensity.npm2, -TreatF)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,sumBMall.g.m2, everything())
 
 # enclosure data biomass matrix in relative abundance; units are % mg
 E.BioPer<- EBiomass %>% group_by(TEid, Taxa) %>%
@@ -354,8 +357,8 @@ E.BioPer<- EBiomass %>% group_by(TEid, Taxa) %>%
   summarise_if(is.numeric,list(~./rowsum)) %>% 
   left_join(ECounts) %>% 
   select(-rowsum, -Nsam,-richness,-Enclosure,-Enc,-WeekG,-Basket., -AreaSamp,
-         -InvertDensity.npm2,-sumBM,-meanBM,-sdBM, -TreatF,-Treatment)%>%
-  select(TEid,Enc2,Week,TreatA,Type,Spp,MusselBiomass.g.m2, everything())
+         -InvertDensity.npm2, -TreatF)%>%
+  select(TEid,Enc2,Week,TreatA,Type,Spp,sumBMall.g.m2, everything())
 
 # Shell Invertebrates -----------
 #shell invertebrates sampled by collecting mussels or sham 

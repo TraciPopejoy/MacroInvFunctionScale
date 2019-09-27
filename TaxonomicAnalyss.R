@@ -90,11 +90,12 @@ ggsave("./Figures/AbundTreat.tiff",width=10, height=4)
 
 FIbm<-ggplot(F.Talpha, aes(x=Mussel.g.m2, y=meanID.npm2))+
   geom_point()+
-  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
-              alpha=0.5)+
-  scale_y_log10(name=expression("Invertebrates # m "^-2))+
-  scale_x_continuous(trans="log1p", breaks=c(0,5,10,50,200),
-                    name=expression("Mussel biomass g m "^-2))
+  #geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
+  #            alpha=0.5)+
+  scale_y_log10(name=expression("Invertebrates # m "^-2),
+                breaks=c(300, 1000, 2000,3000,5000))+
+  scale_x_continuous(trans="log1p", breaks=c(0,5,20,50,200),
+                    name=expression(atop("Reach",paste("Mussel biomass g m "^-2))))
 # from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
 library(scales)
 squish_trans <- function(from, to, factor) {
@@ -130,40 +131,49 @@ squish_trans <- function(from, to, factor) {
 
 library(ggsci)
 EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",], 
-              aes(x=ACT+AMB, y=InvDensity.npm2))+
+              aes(x=sumBMall.g.m2, y=InvDensity.npm2))+
   geom_point(size=2, aes(shape=TreatFAC, fill=TreatFAC))+
   stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",], 
-               aes(x=ACT+AMB, y=InvDensity.npm2, shape=TreatFAC, fill=TreatFAC))+
-  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
-              alpha=0.5)+
-  scale_y_log10(name=expression("Invertebrates # m "^-2),
+               aes(x=125, y=InvDensity.npm2),
+               fun.data = mean_sdl, geom="linerange", 
+               fun.args=list(mult=1))+
+  stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",],
+               aes(x=125, y=InvDensity.npm2),
+               fun.y=mean, geom="point")+
+  geom_vline(xintercept=135, linetype="dashed",color="grey")+
+  scale_y_log10(name="",#expression("Invertebrates # m "^-2),
                 breaks=c(1, 750, 1000,1500, 2000, 3000,4000))+
-  scale_x_continuous(trans = squish_trans(2,140,4),
-                     breaks=c(0,150,200,250,300),
-                     name=expression("Mussel biomass g m "^-2))+
+  scale_x_continuous(trans = "log10", #squish_trans(2,140,4),
+                     breaks=c(125,150,175,200,250,300),
+                     labels=c("CTRL",150,175,200,250,300),
+                     name=expression(atop("Enclosure",
+                                     paste("Mussel biomass g m "^-2))))+
   scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
   scale_fill_manual(name="Treatment",
                      values=c("darkgrey","darkgrey","white","white","black"))+
-  theme(legend.position="none")
+  theme(legend.position="none", axis.title.y=element_text(size=0))
 
 SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
   geom_point(size=2,aes(shape=SheType, fill=SheType))+
-  geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
-              alpha=0.5)+
-  scale_y_log10(name=expression("Invertebrates # m "^-2),
+  scale_y_log10(name="",#expression("Invertebrates # m "^-2),
                 breaks=c(50,100,150,300,500,1000))+
-  scale_x_continuous(trans="log1p", breaks=c(500,1000,1500,2500),
-                     name=expression("Shell Area sampled cm "^2))+
+  scale_x_continuous(trans="log10", breaks=c(500,1000,1500,2500),
+                     name=expression(atop("Shell Area sampled cm "^2,
+                                          paste(""))))+
   scale_shape_manual(name="Shell Type",values=c(23,24,24,23),
                      guide=F)+
   scale_fill_manual(name="Shell Type", 
                     values=c("darkgrey","darkgrey","white","white"),
-                    guide=F)
+                    guide=F)+
+  theme(axis.title.y=element_text(size=0), 
+        axis.title.x=element_text(size=15))
+
 legendBM<-get_legend(EIbm+
-                      theme(legend.position = c(.25,.6),
+                      theme(legend.justification=c(0.5,0.5),
+                            legend.position = c(.5,.5),
                             legend.direction = "horizontal"))
 bmplots<-plot_grid(FIbm, EIbm, SIbm, nrow = 1, labels="AUTO")
-plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
+plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.1))
 ggsave("./Figures/MussAbund.tiff",width=10, height=4)
 
 ##### Taxonomic Diversity Tests #####
@@ -265,18 +275,35 @@ E.TalphaS<-E.Talpha %>% group_by(TreatA,Week) %>%
             meanS=mean(SimpsonsI),
             sdS=sd(SimpsonsI),
             meanMBM=mean(ACT+AMB))
-S.TalphaS<-S.Talpha %>% group_by(TreatA,ShellSpecies) %>%
+S.TalphaS<-S.Talpha %>% group_by(ShellSpecies,Type) %>%
   summarize(meanRt=mean(richness),
             sdR=sd(richness),
-            meanIDt.npm2=mean(InvDensity.npcm2)*10000,
-            sdID=sd(InvDensity.npcm2, na.rm=T)*10000,
+            meanIDt.npm2=log10(mean(InvDensity.npcm2)*10000),
+            sdID=log10(sd(InvDensity.npcm2, na.rm=T)*10000),
             meanS=mean(SimpsonsI),
             sdS=sd(SimpsonsI),
-            meanTShell=mean(TShellSurArea.cm2))
+            meanTShell=mean(TShellSurArea.cm2)/10000)
 tab1<-rbind(F.TalphaS, E.TalphaS, S.TalphaS)
 write.csv(tab1, "Table1.InvertBasics.csv")
 
-
+# looking at Chironomids --------
+head(CCAField.data)
+fchl<-ggplot(CCAField.data, aes(Benthic_CHLA_MG.M2, Dip.ChironomidaeL))+
+  geom_text_repel(aes(label=Reach))+
+  geom_point()+ scale_y_log10()+scale_x_log10()+
+  geom_smooth(method="lm",color="black", linetype="dashed",se=F)
+echl<-ggplot(CCAEnc.data, aes(ChlAdensity, Dip.ChironomidaeL))+
+  geom_point(aes(color=TreatA))+ scale_y_log10()+
+  scale_x_continuous(trans="log1p")+
+  geom_smooth(method="lm",color="black", linetype="dashed",se=F)+
+  theme(legend.position="none")
+schl<-ggplot(CCAS.data, aes(ChlAdensity, Dip.ChironomidaeL))+
+  geom_point(aes(shape=Type))+ scale_y_continuous(trans="log1p")+
+  scale_x_continuous(trans="log1p")+
+  geom_smooth(method="lm",color="black", linetype="dashed",se=F)+
+  theme(legend.position="none")
+plot_grid(fchl,echl,schl,nrow=1)
+ggsave("./Figures/ChlChiron.tiff",width=10, height=2.5)
 
 # Beta Diversity ---------
 
@@ -306,6 +333,8 @@ anova(S.Beta.mod)
 ## Tukey's Honest Significant Differences
 plot(TukeyHSD(S.Beta.mod)) 
 boxplot(S.Beta.mod)
+
+
 
 # Most Abundant Families -----------
 library(devtools)
@@ -476,8 +505,8 @@ F.ComDens2$logMB.g.m2 <- replace(F.ComDens2$logMB.g.m2,F.ComDens2$logMB.g.m2==-I
 ggplot(F.ComDens2, aes(x=logMB.g.m2, y=Dip.ChironomidaeL))+
   geom_smooth(method="lm", color="black", se=F)+
   geom_point(size=3, aes(color=SamplingSeason))+
-  stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
-  scale_color_futurama(name="Season")+theme_krementz()+
+  #stat_smooth_func(geom="text",method="lm",hjust=0,parse=TRUE) +
+  scale_color_futurama(name="Season")+#theme_krementz()+
   theme(legend.position="bottom", legend.direction="horizontal")+
   labs(y="Chironomid n/m2", x="log2 Mussel Biomass g/m2")
 E.ComDens2<-E.ComDens %>% mutate(logMB.g.m2=log(MusselBiomass.g.m2))

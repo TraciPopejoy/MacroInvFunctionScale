@@ -15,22 +15,30 @@ SEOKhu8<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="W
 
 proj4string(FieldSpData) <- proj4string(SEOKhu12)
 FieldSpData$HUC12 <- as.character(over(FieldSpData, SEOKhu12)$HUC12)
-plot(SEOKhu12[SEOKhu12$HUC12 %in% FieldSpData$HUC12,])
-text(FieldSpData, labels=FieldSpData$SiteID)
+#plot(SEOKhu12[SEOKhu12$HUC12 %in% FieldSpData$HUC12,])
+#text(FieldSpData, labels=FieldSpData$SiteID)
 FieldSpData$HUC8 <- as.character(over(FieldSpData, SEOKhu8)$HUC8)
-plot(SEOKhu8[SEOKhu8$HUC8 %in% FieldSpData$HUC8,])
-text(FieldSpData, labels=FieldSpData$SiteID)
+#plot(SEOKhu8[SEOKhu8$HUC8 %in% FieldSpData$HUC8,])
+#text(FieldSpData, labels=FieldSpData$SiteID)
 FieldSpData$HUC12num<-as.numeric(paste(FieldSpData$HUC12)) 
 FieldSpData$HUC8num<-as.numeric(paste(FieldSpData$HUC8)) 
+library(dataRetrieval)
+gagesites <- readNWISdata(site=c("07337900","07338500","07335790","07335700"), 
+                          service = "site")
+coordinates(gagesites)<-c("dec_long_va", "dec_lat_va")
 
-# Discharge ===========================
+#Discharge ===========================
 FieldDischarge<-read_excel("./data/Field Discharge.xlsx") %>% 
   group_by(Reach, SamplingSeason) %>%
   summarize(Discharge.cms=mean(`Discharge (M3/s)`, na.rm=T))
 ####suplementing values find a better way! ###
 #based on F16 data from respective reach (or S16 for L3)
+FieldDischarge %>% left_join(FieldSpData@data) %>%
+  filter(SamplingSeason=="Fall2016") %>%
+  ungroup() %>% group_by(River,`USGS gage Identifier`)%>%
+  summarize(median(Discharge.cms), IQR(Discharge.cms))
 
-EncDVw09<-read.csv("../FEn17//FEn17_data/EncPhysDisFEn17OK.csv") %>% 
+EncDVw09<-read.csv("../FEn17/FEn17_data/EncPhysDisFEn17OK.csv") %>% 
   rename(Enclosure=`ï..Enclosure`) %>% left_join(TreatENC) %>%
   mutate(Discharge.cms=0.25*V.mps*Depth.m,
          Week="w09") %>%
@@ -41,6 +49,10 @@ EncDVw12<-read_excel("../FEn17/FEn17_data/videowithabiotics.xlsx") %>%
          Week="w12") %>% filter(Month=="Oct") %>%
   dplyr::select(Enc2,Week,Discharge.cms)
 EncDischarge<-rbind(EncDVw09,EncDVw12)
+EncDtran<-read_excel("../FEn17/FEn17_data/FieldEncDataSum2017V2.xlsx", 
+                     sheet="DischargeT") %>%
+  filter(Date >"2017-09-17 00:00:00") 
+EncDtran %>% summarize(meanSeptD=mean(totalQ.cms, na.rm=T))
 
 # Chlorophyll Abundance ===============
 FieldChlA<-read_excel("./data/Field Chlorophyll.xlsx") %>% slice(-14)
@@ -88,7 +100,7 @@ peb.wolfman<-peb.raw[,1:3]  %>% rename(Treatment = Reach) %>%
   mutate(Reach=paste(SiteID, Treatment, sep="-"))
 for(k in 1:nrow(peb.raw)){
   store<-MakeCFD(as.matrix(peb.raw[k,4:104]))
-  wolf<-WolmanCI(store, n=100, P=c(10,50,90))
+  wolf<-WolmanCI(store, n=100, P=c(10,50,90,60))
   sub<-data.frame(D10=wolf[1,2],
            D10low=wolf[1,3],
            D10high=wolf[1,4],
@@ -97,8 +109,9 @@ for(k in 1:nrow(peb.raw)){
            D50high=wolf[2,4],
            D90=wolf[3,2],
            D90low=wolf[3,3],
-           D90high=wolf[3,4])
-  peb.wolfman[k,5:13]<-sub
+           D90high=wolf[3,4],
+           D60=wolf[4,2])
+  peb.wolfman[k,5:14]<-sub
 }
 
 ggplot(store, aes(x=size, y=probs))+geom_point()+geom_line()+
@@ -108,7 +121,7 @@ peb.enc<-read_excel("./data/Enc_pebbles.xlsx", sheet = "fixed")
 peb.enc.sum<-peb.enc[,1:2]  
 for(k in 1:nrow(peb.enc)){
   store<-MakeCFD(as.matrix(peb.enc[k,3:27]))
-  wolf<-WolmanCI(store, n=25, P=c(10,50,90))
+  wolf<-WolmanCI(store, n=25, P=c(10,50,90,60))
   sub<-data.frame(D10=wolf[1,2],
                   D10low=wolf[1,3],
                   D10high=wolf[1,4],
@@ -117,23 +130,26 @@ for(k in 1:nrow(peb.enc)){
                   D50high=wolf[2,4],
                   D90=wolf[3,2],
                   D90low=wolf[3,3],
-                  D90high=wolf[3,4])
-  peb.enc.sum[k,3:11]<-sub
+                  D90high=wolf[3,4],
+                  D60=wolf[4,2]
+                  )
+  peb.enc.sum[k,3:12]<-sub
 }
 
-peb.ENC.sum<-peb.enc.sum %>% left_join(TreatENC)
+peb.ENC.sum<-peb.enc.sum %>% mutate(Dvar=D60/D10) %>%left_join(TreatENC)
 ggplot(peb.ENC.sum, aes(x=TreatA, y=D50))+geom_boxplot()
+ggplot(peb.ENC.sum, aes(x=TreatA, y=Dvar))+geom_boxplot()
 
 # Summary =========
 #joined data frames
 Fenv.data<-FieldChlA %>% full_join(FieldDischarge) %>% 
   left_join(FieldSpData@data) %>%
-  left_join(peb.wolfman) %>% 
+  left_join(peb.wolfman) %>% mutate(Dvar=D60/D10) %>%
   select(Reach,SamplingSeason,WC_CHLA_MG.L,Benthic_CHLA_MG.M2,
-         Discharge.cms,HUC8num,HUC12num,D10,D50,D90)
+         Discharge.cms,HUC8num,HUC12num,Dvar,D50,D90)
 
 Eenv.data<-EncChlAraw %>% left_join(EncDischarge) %>% 
-  left_join(TreatENC) %>% left_join(peb.enc.sum) %>%
+  left_join(TreatENC) %>% left_join(peb.ENC.sum) %>%
   select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
-         D10, D50, D90)
+         Dvar, D50, D90)
 
