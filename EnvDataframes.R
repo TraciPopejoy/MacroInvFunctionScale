@@ -152,4 +152,3 @@ Eenv.data<-EncChlAraw %>% left_join(EncDischarge) %>%
   left_join(TreatENC) %>% left_join(peb.ENC.sum) %>%
   select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
          Dvar, D50, D90)
-

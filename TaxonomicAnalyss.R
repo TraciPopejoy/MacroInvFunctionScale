@@ -1,4 +1,5 @@
 source("InvDataframes.R")
+source("EnvDataframes.R")
 
 F.ComDens16<-F.ComDens %>% filter(SamplingSeason=="Fall2016")
 F.ComDens16 %>% select(-Year, -InvDensity.npm2R) %>% 
@@ -16,12 +17,34 @@ S.ComDens %>% ungroup()%>%
 
 # Field Data
 #head(F.ComDens)
-sum(colSums(F.ComDens16[,-c(1:7,70:71)])>1) #gamma diversity?
+sum(colSums(F.ComDens16[,-c(1:7,70:71)])>1) # total gamma diversity
+#gamma diversity without mussel beds
+sum(colSums(F.ComDens16[F.ComDens16$Treatment!="MR",-c(1:7,70:71)])>1)
+#exploring watershed gamma diversity
+F.ComDens16 %>% 
+  select(-Year, -InvDensity.npm2R,-`Average of STDM (g.m-2)`) %>% 
+  mutate(WS=substr(Reach,1,1),
+         WSR=case_when(WS=="K"~"Kiamichi",
+                       T~"Little")) %>%
+  group_by(WSR,Treatment) %>% 
+  summarise_if(is.numeric,list(sumT=sum)) %>%
+  gather(variable, value, -WSR, -Treatment) %>% 
+  filter(value!=0) %>% select(Treatment, WSR, variable) %>%
+  group_by(WSR,Treatment) %>%tally()
 
-F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
+View(F.ComDens16 %>% 
+       select(-Year, -InvDensity.npm2R, -`Average of STDM (g.m-2)`) %>% 
+  mutate() %>%
+  group_by(Treatment) %>%
+  summarise_if(is.numeric,list(sumT=sum)) %>%
+  gather(variable, value, -Treatment) %>% 
+  arrange(value) %>% filter(value==0) %>%
+  spread(variable, value))
+
+F.TalphaSub<-data.frame(F.ComDens16[,c(1:7)],
            richness=specnumber(F.ComDens16[,-c(1:7, 70:71)]),
            SimpsonsI=diversity(F.ComDens16[,-c(1:7,70:71)], "simpson")) %>%
-  group_by(Reach, SamplingSeason, Treatment, Season, Mussel.g.m2) %>%
+  group_by(Reach, SamplingSeason, Treatment, Season, Average.of.STDM..g.m.2.) %>%
   summarize(meanID.npm2=mean(InvDensity.npm2R),
             meanR=mean(richness),
             meanSimp=mean(SimpsonsI)) %>%
@@ -29,10 +52,10 @@ F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
   left_join(FieldSpData@data)
 mean(F.Talpha$meanR);sd(F.Talpha$meanR)
 ggplot(F.Talpha, aes(x=Treatment, y=meanSimp))+
-  geom_boxplot(fill="grey")+facet_wrap(~Season)+
+  geom_boxplot(fill="grey")+#facet_wrap(~Season)+
   ylab("Simpson Diversity Index")
 ggplot(F.Talpha, aes(x=Treatment, y=meanR))+
-  geom_boxplot(fill="grey")+facet_wrap(~Season)+
+  geom_boxplot(fill="grey")+#facet_wrap(~Season)+
   ylab("Richness")
 FIn<-ggplot(F.Talpha, aes(x=TreatFAC, y=meanID.npm2))+
   geom_boxplot(fill="grey")+
@@ -42,12 +65,12 @@ FIn<-ggplot(F.Talpha, aes(x=TreatFAC, y=meanID.npm2))+
 
 #Enclosure Data
 #head(E.ComDens)
-sum(colSums(E.ComDens12[,-c(1:9)])>1) #gamma diversity?
+sum(colSums(E.ComDens12[,-c(1:8)])>0.1) #gamma diversity?
 
 E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
-                     InvDensity.npm2=rowSums(E.ComDens12[,-c(1:9)]),
-                     richness=specnumber(E.ComDens12[,-c(1:9)]),
-                     SimpsonsI=diversity(E.ComDens12[,-c(1:9)], "simpson"),
+                     InvDensity.npm2=rowSums(E.ComDens12[,-c(1:8)]),
+                     richness=specnumber(E.ComDens12[,-c(1:8)]),
+                     SimpsonsI=diversity(E.ComDens12[,-c(1:8)], "simpson"),
                      TreatFAC=factor(E.ComDens12$TreatA, 
                                     levels=c("CTRL","ACTL","ACTS","AMBL","AMBS"),
                                     labels=c("Control",
@@ -88,14 +111,15 @@ library(cowplot)
 plot_grid(FIn,EIn,SIn, nrow=1,labels="AUTO")
 ggsave("./Figures/AbundTreat.tiff",width=10, height=4)
 
-FIbm<-ggplot(F.Talpha, aes(x=Mussel.g.m2, y=meanID.npm2))+
-  geom_point()+
+FIbm<-ggplot(F.Talpha, aes(x=Average.of.STDM..g.m.2., y=meanID.npm2))+
+  geom_point(size=2)+
   #geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
   #            alpha=0.5)+
   scale_y_log10(name=expression("Invertebrates # m "^-2),
-                breaks=c(300, 1000, 2000,3000,5000))+
+                breaks=c(0, 200,300, 1000, 2000,3000,5000))+
   scale_x_continuous(trans="log1p", breaks=c(0,5,20,50,200),
-                    name=expression(atop("Reach",paste("Mussel biomass g m "^-2))))
+                    name=expression(atop("Reach",paste("Mussel biomass g m "^-2))))+
+  expand_limits(y=200)#+geom_text_repel(aes(label=Reach), size=2)
 # from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
 library(scales)
 squish_trans <- function(from, to, factor) {
@@ -142,7 +166,7 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
                fun.y=mean, geom="point")+
   geom_vline(xintercept=135, linetype="dashed",color="grey")+
   scale_y_log10(name="",#expression("Invertebrates # m "^-2),
-                breaks=c(1, 750, 1000,1500, 2000, 3000,4000))+
+                breaks=c(1,500, 750, 1000,1500, 2000, 3000,4000))+
   scale_x_continuous(trans = "log10", #squish_trans(2,140,4),
                      breaks=c(125,150,175,200,250,300),
                      labels=c("CTRL",150,175,200,250,300),
@@ -151,12 +175,13 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
   scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
   scale_fill_manual(name="Treatment",
                      values=c("darkgrey","darkgrey","white","white","black"))+
-  theme(legend.position="none", axis.title.y=element_text(size=0))
+  theme(legend.position="none", axis.title.y=element_text(size=0))+
+  expand_limits(y=500)
 
 SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
   geom_point(size=2,aes(shape=SheType, fill=SheType))+
   scale_y_log10(name="",#expression("Invertebrates # m "^-2),
-                breaks=c(50,100,150,300,500,1000))+
+                breaks=c(30,50,100,150,300,500,1000))+
   scale_x_continuous(trans="log10", breaks=c(500,1000,1500,2500),
                      name=expression(atop("Shell Area sampled cm "^2,
                                           paste(""))))+
@@ -166,34 +191,36 @@ SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
                     values=c("darkgrey","darkgrey","white","white"),
                     guide=F)+
   theme(axis.title.y=element_text(size=0), 
-        axis.title.x=element_text(size=15))
+        axis.title.x=element_text(size=15))+
+  expand_limits(y=30)
 
+library(cowplot)
 legendBM<-get_legend(EIbm+
                       theme(legend.justification=c(0.5,0.5),
                             legend.position = c(.5,.5),
                             legend.direction = "horizontal"))
 bmplots<-plot_grid(FIbm, EIbm, SIbm, nrow = 1, labels="AUTO")
 plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.1))
-ggsave("./Figures/MussAbund.tiff",width=10, height=4)
+ggsave("./Figures/MussAbundNov14.tiff",width=9, height=4)
 
 ##### Taxonomic Diversity Tests #####
 #Field - need to use a mixed model to account for space
 library(lme4);library(lmerTest)
-finv<-lmer(log10(meanID.npm2)~Mussel.g.m2+(1|HUC12), data=F.Talpha)
-summary(finv)
+finv<-lmer(log10(meanID.npm2)~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
+anova(finv)
 hist(residuals(finv),col="darkgrey") #approximates normal
 plot(fitted(finv), residuals(finv))  #approximates heteroskodastity
 qqnorm(resid(finv));qqline(resid(finv))
 
-fric<-lmer(log(meanR)~Mussel.g.m2+(1|HUC12), data=F.Talpha)
-summary(fric)
+fric<-lmer(log(meanR)~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
+anova(fric)
 hist(residuals(fric),col="darkgrey") #approximates normal
 plot(fitted(fric), residuals(fric)) 
 qqnorm(resid(fric));qqline(resid(fric))
 mean(F.Talpha$meanR);sd(F.Talpha$meanR)
 
-fsim<-lmer(meanSimp~Mussel.g.m2+(1|HUC12), data=F.Talpha)
-summary(fsim)
+fsim<-lmer(meanSimp~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
+anova(fsim)
 hist(residuals(fsim),col="darkgrey") #approximates normal
 plot(fitted(fsim), residuals(fsim)) 
 qqnorm(resid(fsim));qqline(resid(fsim))
@@ -1073,3 +1100,37 @@ S.BioDens.plot$TotalBM<-rowSums(S.BioDens[,8:32], na.rm=T)*10000
 View(S.BioDens.plot %>% group_by(TreatA, ShellSpecies) %>%
        summarize(sumBM=round(mean(TotalBM, na.rm=T),2), 
                  sdBM=round(sd(TotalBM, na.rm=T),2)))
+
+
+#### building plot like Vaughn 2006-----
+
+taxtest<-F.ComDens16 %>%
+  select(-FSamID, -SamplingSeason, -Season,-SampSeaF, -Year,
+         -InvDensity.npm2R) %>%
+  gather(Taxa, abun, -Reach, -Treatment,-`Average of STDM (g.m-2)`) %>%
+  left_join(FTaxaTable) %>% 
+  group_by(Reach, Treatment, `Average of STDM (g.m-2)`,Order) %>%
+  summarise(sumD=sum(abun)) %>%
+  filter(Order %in% c("Diptera", "Ephemeroptera",
+                      "Coleoptera","Tricoptera",
+                      "Plecoptera","Odonata"))
+ggplot(taxtest, 
+       aes(x=`Average of STDM (g.m-2)`,  y=sumD))+
+  geom_point(aes(color=Treatment))+
+  scale_color_futurama()+
+  geom_smooth(method="lm", level=0, color="black")+
+  facet_wrap(~Order)
+
+taxtest2<-E.ComDens12 %>% ungroup() %>%
+  select(-TEid, -Week, -Enc, -Spp) %>%
+  gather(Taxa, abun, -Enc2, -TreatA, -Type,-sumBMall.g.m2) %>%
+  left_join(FTaxaTable) %>% 
+  group_by(Enc2, TreatA, Type,sumBMall.g.m2,Order) %>%
+  summarise(sumD=sum(abun)) %>%
+  filter(Order %in% c("Diptera", "Ephemeroptera",
+                      "Coleoptera","Tricoptera",
+                      "Plecoptera","Odonata"))
+ggplot(taxtest2, 
+       aes(x=Order, y=sumD))+
+  geom_boxplot(aes(fill=Type))+
+  scale_fill_futurama()

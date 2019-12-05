@@ -97,7 +97,7 @@ head(SizeSpecData)
 #total count is 41077
 #2755 lost because order has no BM regression
 #2131 lost because out of regression size range
-nrow(SizeSpecData) 
+nrow(SizeSpecData) #38949
 # need to account for different sample sizes; need to average at reach level
 
 ggplot(SizeSpecData, aes(x=Treatment, y=Length.mm/10, fill=SampSeaF))+
@@ -126,14 +126,14 @@ if(test1 == TRUE){
 }
 
 # save results
-write.csv(binned, "binned_size_spectra.csv",
+write.csv(binned, "binned_size_spectraNov5.csv",
           row.names = FALSE)
 
 # 3_statistical_analyses
 library(MuMIn);library(quantreg);library(ggplot2)
 
 # read in binned size spectra data
-binned <- read.csv("binned_size_spectra.csv",
+binned <- read.csv("binned_size_spectraNov5.csv",
                    stringsAsFactors = FALSE)
 # make a data frame with the appropriate info: Mussel biomass, year, season, huc12
 SizeRegData<-binned %>% left_join(unique(fieldSiteKey[,-1])) %>% 
@@ -144,14 +144,14 @@ SizeRegData<-binned %>% left_join(unique(fieldSiteKey[,-1])) %>%
 # global models ####
 # full quadratic
 global.quadratic <- lm(log_count_corrected~ 
-                         log_mids_center *Mussel.g.m2 +
+                         log_mids_center * Mussel.g.m2 +
                          I(log_mids_center^2) + 
-                         I(log_mids_center^2):Mussel.g.m2+Year+HUC12num+Season,
+                         I(log_mids_center^2):Mussel.g.m2, #+Year+Season,
                        data=SizeRegData,
                        na.action = "na.fail")
 # full linear model
 global.linear <- lm(log_count_corrected ~ 
-                      log_mids_center*Mussel.g.m2+Year+HUC12num+Season,
+                      log_mids_center+Mussel.g.m2,#+Year+HUC12num+Season,
                     data=SizeRegData,
                     na.action = "na.fail")
 # compare quadratic and linear models
@@ -170,7 +170,7 @@ dredge.models.lin <- dredge(global.linear,
 
 # table 2 for MS #### 
 # table with results for all simplified models
-sink("table_2.txt")
+sink("table_2Nov5.txt")
 dredge.models.quad
 sink()
 
@@ -190,10 +190,10 @@ saveRDS(top.models[[1]],
 # Mrange ####
 # calculate range of M values
 mrange <- SizeRegData %>% 
-  group_by(site, Mussel.bm.g) %>%
+  group_by(Reach,FSamID, Mussel.bm.g) %>%
   summarise(mrange = max(log_mids_center) - min(log_mids_center))
 # save Mrange as csv
-write.csv(mrange, "results/mrange_data.CSV",
+write.csv(mrange, "mrange_data.csv",
           row.names = FALSE)
 
 # mrange ~ gradient linear model
