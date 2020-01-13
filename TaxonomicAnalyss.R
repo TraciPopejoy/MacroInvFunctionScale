@@ -41,7 +41,7 @@ View(F.ComDens16 %>%
   arrange(value) %>% filter(value==0) %>%
   spread(variable, value))
 
-F.TalphaSub<-data.frame(F.ComDens16[,c(1:7)],
+F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
            richness=specnumber(F.ComDens16[,-c(1:7, 70:71)]),
            SimpsonsI=diversity(F.ComDens16[,-c(1:7,70:71)], "simpson")) %>%
   group_by(Reach, SamplingSeason, Treatment, Season, Average.of.STDM..g.m.2.) %>%
@@ -59,7 +59,7 @@ ggplot(F.Talpha, aes(x=Treatment, y=meanR))+
   ylab("Richness")
 FIn<-ggplot(F.Talpha, aes(x=TreatFAC, y=meanID.npm2))+
   geom_boxplot(fill="grey")+
-  scale_y_log10(name=expression("Invertebrate # m "^-2))+
+  scale_y_log10(name=expression("individuals "%.%" m "^-2))+
   scale_x_discrete(name="Treatment",
                    labels=c("Control\nReach","Mussel\nReach"))
 
@@ -74,10 +74,10 @@ E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
                      TreatFAC=factor(E.ComDens12$TreatA, 
                                     levels=c("CTRL","ACTL","ACTS","AMBL","AMBS"),
                                     labels=c("Control",
-                                             'Actinonaias\nLive',
-                                             'Actinonaias\nSham',
-                                             'Amblema\nLive',
-                                             'Amblema\nSham')))
+                                             'A.ligamentina\nLive',
+                                             'A.ligamentina\nSham',
+                                             'A.plicata\nLive',
+                                             'A.plicata\nSham')))
 ggplot(E.Talpha, aes(x=TreatA, y=SimpsonsI))+
   geom_boxplot(fill="grey")#+facet_wrap(~Week)
 ggplot(E.Talpha, aes(x=TreatA, y=richness))+
@@ -103,7 +103,7 @@ ggplot(S.Talpha, aes(x=TreatA, y=richness))+
   geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")
 SIn<-ggplot(S.Talpha, aes(x=SheType, y=InvDensity.npcm2*10000))+
   geom_boxplot(fill="grey")+
-  scale_y_log10(name=expression("Invertebrate # m "^-2),)+
+  scale_y_log10(name=expression("individuals "%.%" m "^-2),)+
   scale_x_discrete(name="Treatment", labels=c('Actinonaias\nLive','Actinonaias\nSham',
                                               'Amblema\nLive','Amblema\nSham'))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
@@ -115,11 +115,13 @@ FIbm<-ggplot(F.Talpha, aes(x=Average.of.STDM..g.m.2., y=meanID.npm2))+
   geom_point(size=2)+
   #geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
   #            alpha=0.5)+
-  scale_y_log10(name=expression("Invertebrates # m "^-2),
+  scale_y_log10(name="",
                 breaks=c(0, 200,300, 1000, 2000,3000,5000))+
   scale_x_continuous(trans="log1p", breaks=c(0,5,20,50,200),
-                    name=expression(atop("Reach",paste("Mussel biomass g m "^-2))))+
-  expand_limits(y=200)#+geom_text_repel(aes(label=Reach), size=2)
+                    name=expression("mussel biomass g"%.%"m"^-2))+
+  expand_limits(y=200)+
+  theme(axis.text.x = element_text(angle=30),
+        axis.title.x=element_text(size=12)) #+geom_text_repel(aes(label=Reach), size=2)
 # from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
 library(scales)
 squish_trans <- function(from, to, factor) {
@@ -164,44 +166,45 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
   stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",],
                aes(x=125, y=InvDensity.npm2),
                fun.y=mean, geom="point")+
-  geom_vline(xintercept=135, linetype="dashed",color="grey")+
+  #geom_vline(xintercept=135, linetype="dashed",color="grey")+
   scale_y_log10(name="",#expression("Invertebrates # m "^-2),
                 breaks=c(1,500, 750, 1000,1500, 2000, 3000,4000))+
   scale_x_continuous(trans = "log10", #squish_trans(2,140,4),
                      breaks=c(125,150,175,200,250,300),
                      labels=c("CTRL",150,175,200,250,300),
-                     name=expression(atop("Enclosure",
-                                     paste("Mussel biomass g m "^-2))))+
+                     name=expression("mussel biomass g"%.%"m"^-2))+
   scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
   scale_fill_manual(name="Treatment",
                      values=c("darkgrey","darkgrey","white","white","black"))+
   theme(legend.position="none", axis.title.y=element_text(size=0))+
-  expand_limits(y=500)
+  expand_limits(y=500)+
+  theme(axis.text.x = element_text(angle=30),
+        axis.title.x=element_text(size=12))
 
 SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
   geom_point(size=2,aes(shape=SheType, fill=SheType))+
-  scale_y_log10(name="",#expression("Invertebrates # m "^-2),
-                breaks=c(30,50,100,150,300,500,1000))+
-  scale_x_continuous(trans="log10", breaks=c(500,1000,1500,2500),
-                     name=expression(atop("Shell Area sampled cm "^2,
-                                          paste(""))))+
+  scale_y_log10(name=expression("individuals "%.%" m "^-2),
+                breaks=c(50,100,150,300,500,1000))+
+  scale_x_continuous(trans="log10", breaks=c(250,500,1000,1500,2500),
+                     name=expression("area sampled cm"^2))+
   scale_shape_manual(name="Shell Type",values=c(23,24,24,23),
                      guide=F)+
   scale_fill_manual(name="Shell Type", 
                     values=c("darkgrey","darkgrey","white","white"),
                     guide=F)+
-  theme(axis.title.y=element_text(size=0), 
-        axis.title.x=element_text(size=15))+
-  expand_limits(y=30)
+  theme(axis.title.y=element_text(size=0),
+        axis.text.x = element_text(angle=30),
+        axis.title.x=element_text(size=12))+
+  expand_limits(x=250,y=50)
 
 library(cowplot)
 legendBM<-get_legend(EIbm+
                       theme(legend.justification=c(0.5,0.5),
-                            legend.position = c(.5,.5),
+                            legend.position = c(.5,.6),
                             legend.direction = "horizontal"))
-bmplots<-plot_grid(FIbm, EIbm, SIbm, nrow = 1, labels="AUTO")
-plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.1))
-ggsave("./Figures/MussAbundNov14.tiff",width=9, height=4)
+bmplots<-plot_grid(SIbm, EIbm, FIbm, nrow = 1, labels="AUTO")
+plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
+ggsave("./Figures/MussAbundDec30.tiff",width=9, height=3.5)
 
 ##### Taxonomic Diversity Tests #####
 #Field - need to use a mixed model to account for space

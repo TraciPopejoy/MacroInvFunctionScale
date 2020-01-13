@@ -51,10 +51,10 @@ cca.F.sum<-summary(cca.F) #look at the summary of cca results
 sort(cca.F.sum$biplot[,1])
 sort(cca.F.sum$biplot[,2])  
 #what are the species that had the 3 highest and lowest loadings
-CCAF.impsp<-data.frame(CCA1.high=as.character(names(sort(cca.F.sum$species[,1],decreasing=T)[1:3])),
-              CCA1.low=as.character(names(sort(cca.F.sum$species[,1], decreasing=F)[1:3])),
-              CCA2.high=as.character(names(sort(cca.F.sum$species[,2],decreasing=T)[1:3])),
-              CCA2.low=as.character(names(sort(cca.F.sum$species[,2], decreasing=F)[1:3])))
+CCAF.impsp<-data.frame(CCA1.high=as.character(names(sort(cca.F.sum$species[,1],decreasing=T)[1:2])),
+              CCA1.low=as.character(names(sort(cca.F.sum$species[,1], decreasing=F)[1:2])),
+              CCA2.high=as.character(names(sort(cca.F.sum$species[,2],decreasing=T)[1:2])),
+              CCA2.low=as.character(names(sort(cca.F.sum$species[,2], decreasing=F)[1:2])))
 cca.F.sum$constr.chi/cca.F.sum$tot.chi*100 # percentage constrained variation
 
 cca.F0<-cca(field.com~1+Condition(HUC12num), field.env, scaling=2) #set a null model for ordistep
@@ -124,20 +124,20 @@ cca.E.sum<-summary(cca.E)
 #how much variation each CCA contributes to constraint variation explained
 sort(cca.E.sum$biplot[,1]) 
 #identify important (high or low loadings) species
-CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[1:3]),
-                       CCA1.low=names(sort(cca.E.sum$species[,1], decreasing=F)[1:3]),
-                       CCA2.high=names(sort(cca.E.sum$species[,2],decreasing=T)[1:3]),
-                       CCA2.low=names(sort(cca.E.sum$species[,2], decreasing=F)[1:3]))
+CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[1:2]),
+                       CCA1.low=names(sort(cca.E.sum$species[,1], decreasing=F)[1:2]),
+                       CCA2.high=names(sort(cca.E.sum$species[,2],decreasing=T)[1:2]),
+                       CCA2.low=names(sort(cca.E.sum$species[,2], decreasing=F)[1:2]))
 cca.E.sum$constr.chi/cca.E.sum$tot.chi*100 #percentage contrained inertia
 
 anova(cca.E, perm=1000) #run the anova-like permutations; its not significant
 
 # variation partitioning to look at mussel vs. environment importance
 EVar<-varpart(enc.com[,-10], ~ACT+AMB+Live, 
-              ~ChlAdensity+Discharge.cms+Dvar,
+              ~ChlAdensity+Discharge.cms,
               data=enc.env, chisquare = T, 
               permutations=1000)
-plot (EVar, digits = 2, Xnames = c('Mussel', 'Environ.'), 
+plot (EVar, digits = 2, Xnames = c('Mussel', 'Environ'), 
       bg = c('navy', 'tomato'))
 
 ##### Shell Data Analysis --------------------------------
@@ -177,10 +177,10 @@ cca.S.sum<-summary(cca.S)
 sort(cca.S.sum$biplot[,1]) #loadings on CCA1
 sort(cca.S.sum$biplot[,2])
 #identify high and low loading species on CCA1 and CCA2
-CCAS.impsp<-data.frame(CCA1.high=names(sort(cca.S.sum$species[,1],decreasing=T)[1:3]),
-              CCA1.low=names(sort(cca.S.sum$species[,1], decreasing=F)[1:3]),
-              CCA2.high=names(sort(cca.S.sum$species[,2],decreasing=T)[1:3]),
-              CCA2.low=names(sort(cca.S.sum$species[,2], decreasing=F)[1:3]))
+CCAS.impsp<-data.frame(CCA1.high=names(sort(cca.S.sum$species[,1],decreasing=T)[1:2]),
+              CCA1.low=names(sort(cca.S.sum$species[,1], decreasing=F)[1:2]),
+              CCA2.high=names(sort(cca.S.sum$species[,2],decreasing=T)[1:2]),
+              CCA2.low=names(sort(cca.S.sum$species[,2], decreasing=F)[1:2]))
 #how much variation each CCA contributes to constraint variation explained
 cca.S.sum$concont
 cca.S.sum$constr.chi/cca.S.sum$tot.chi*100 #porportion explained by constraints
@@ -198,9 +198,6 @@ SVar<-varpart(shell.com, ~ShellSpecies+Type,
               ~ChlAdensity,
               data=shell.env, chisquare = T, 
               permutations=1000)
-plot(SVar, digits = 2, Xnames = c('Mussel', 'Environ.'), 
-      bg = c('navy', 'tomato'))
-
 
 ##### CCA Plots ========================================
 #install.packages("devtools")
@@ -232,9 +229,6 @@ FieldCCA<-ggplot()+
              alpha=.5)+
   #plot important species as black points
   geom_point(data=tidy.ccaFspespe, aes(x=CCA1,y=CCA2)) +
-  geom_text_repel(data=frep, aes(x=CCA1,y=CCA2, #label the imp. species
-                                  label=Tlabel, color=Score, size=Score),
-                  parse=T, box.padding =.3)+
   #plot the environ. variables
   geom_segment(data = tidy.ccaFcon[tidy.ccaFcon$Score=="biplot",],
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
@@ -242,8 +236,7 @@ FieldCCA<-ggplot()+
   scale_x_continuous(name="CCA 1 : 35.7%")+
   scale_y_continuous(name="CCA 2 : 10.6%") +
   scale_color_manual(values=c("red","black")) +
-  scale_size_manual(values=c(3.5,2.8))+ #changing label sizes
-  theme(legend.position = "none")
+  scale_size_manual(values=c(3.5,2.8)) #changing label sizes
 FieldCCA
 
 # Enclosure Plot -------------------------------
@@ -285,14 +278,11 @@ EncCCA<-ggplot()+
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
                arrow = arrow(length = unit(0.0, "cm")))+
   #label environmental and imp. species
-  geom_text_repel(data=erep, aes(x=CCA1,y=CCA2, label=Tlabel,
-                                 color=Score, size=Score),
-                  parse=T, direction="both") +
-  
   scale_x_continuous(name="CCA 1 : 5.3%")+
   scale_y_continuous(name="CCA 2 : 3.0%")+
-  scale_color_manual(values=c("red","navy","black"), guide=F) +
-  scale_size_manual(values=c(4,4,2.8), guide=T)
+  scale_color_manual(values=c("red","navy","black")) +
+  scale_size_manual(values=c(4,4,2.8))+
+  theme(legend.position = "none")
 EncCCA
 
 #Shell Plot ---------------------------------------
@@ -302,7 +292,11 @@ tidy.ccaSSp<-tidy.ccaS %>% filter(Score=="species") %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
 #dataframe of imp. species loadings
 tidy.ccaSspespe<-tidy.ccaS %>% filter(Score=="species",
-                                  Label %in% unique(c(t(CCAS.impsp)))) %>%
+                                  Label %in% c("Col.ElmA","Ostracoda",
+                                               "Eph.LeptA","Tri.Helicophyche",
+                                               "Tri.Hydroptilidae","Gas.Planorbidae",
+                                               "Dip.ChironomidaeL","Tri.Lepidostomatidae",
+                                               "Dip.Tipulidae","Hydrozoans.miscH")) %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
 #dataframe of environmental variables
 tidy.ccaScon<-tidy.ccaS %>% filter(Score!="species",
@@ -328,9 +322,6 @@ shellCCA<-ggplot()+
   geom_segment(data = tidy.ccaScon[tidy.ccaScon$Score=="biplot",],
                aes(x = 0, y = 0, xend = CCA1, yend = CCA2),
                arrow = arrow(length = unit(0.0, "cm")))+
-  geom_text_repel(data=srep, aes(x=CCA1,y=CCA2, label=Tlabel,
-                               size=Score, color=Score),
-                  parse=T) +
   scale_x_continuous(name="CCA 1 : 6.9%")+
   scale_y_continuous(name="CCA 2 : 4.8%")+
   scale_color_manual(values=c("red","navy","black"), guide=F) +
@@ -350,11 +341,88 @@ ggplot()+
   geom_text_repel(data=tidy.ccaSSp, aes(x=CCA1,y=CCA2, label=Tlabel))+
   scale_color_manual(values=c("red","blue"), guide=F)
   
-# Final CCA plot ---------------------------------
+# CCA with all text plot ---------------------------------
 library(cowplot)
-ccaplot<-plot_grid(FieldCCA, EncCCA, shellCCA, nrow=1, labels="AUTO") #plot the boxes together
-legend1<-get_legend(EncCCA+ #pull the legend out and make it better
-                      theme(legend.position = c(.1,.9),
+
+FCCA_atext<-FieldCCA+
+  geom_text_repel(data=frep, aes(x=CCA1,y=CCA2, #label everything
+                               label=Tlabel, color=Score, size=Score),
+                parse=T, box.padding =.3)
+
+ECCA_atest<-EncCCA + geom_text_repel(data=erep, aes(x=CCA1,y=CCA2, label=Tlabel,
+                               color=Score, size=Score),
+                parse=T, direction="both")
+
+SCCA_atext<-shellCCA + 
+  geom_text_repel(data=srep, aes(x=CCA1,y=CCA2, label=Tlabel,
+                                 size=Score, color=Score),
+                          parse=T)
+
+cca_atext<-plot_grid(FCCA_atext, ECCA_atest, SCCA_atext, nrow=1, labels="AUTO") #plot the boxes together
+legend1<-get_legend(ECCA_atest+ #pull the legend out and make it better
+                      theme(legend.position = c(.3,.8),
                             legend.direction = "horizontal"))
-plot_grid(ccaplot,legend1, nrow=2, rel_heights = c(1,.1)) #print both boxes and label
-ggsave("./Figures/CCAplotsGDec4.tiff", width=11, height=4)
+plot_grid(cca_atext,legend1, nrow=2, rel_heights = c(1,.1)) #print both boxes and label
+ggsave("./Figures/CCAplotsAllText.tiff", width=11, height=4)
+
+# CCA with just important sp text plots ----------
+FCCA_sp<-FieldCCA+
+  geom_text_repel(data=frep[frep$Score=="species",], 
+                  aes(x=CCA1,y=CCA2, #label the imp. species
+                      label=Tlabel),size=3)
+
+ECCA_sp<-EncCCA + 
+  geom_text_repel(data=erep[erep$Score=="species",], 
+                  aes(x=CCA1,y=CCA2, label=Tlabel),size=3, parse=T)
+
+SCCA_sp<-shellCCA + 
+  geom_text_repel(data=srep[srep$Score=="species",], 
+                  aes(x=CCA1,y=CCA2, label=Tlabel), size=3,parse=T)
+
+plot_grid(FCCA_sp, ECCA_sp, SCCA_sp, nrow=1, 
+                  labels="AUTO") #plot the boxes together
+ggsave("./Figures/CCAplotsspText2.tiff", width=11, height=4)
+
+
+### Making pie charts and venn diagrams ----
+#install.packages('VennDiagram')
+
+#library(VennDiagram)
+FVar
+fmusVar<-RsquareAdj(cca(field.com[, -c(7, 13, 22)]
+  ~`Average of STDM (g.m-2)`, data = field.env))
+
+library(venneuler)
+fven <- venneuler(c(Mussels=0, Environment=23.2,
+                    Location=6.1,
+                    "Mussels&Environment"=12.6,
+                    "Environment&Location"=1.5,
+                    "Mussels&Location"=0.85,
+                    "Mussels&Location&Environment"=0))
+plot(fven)
+
+EVar;plot(EVar)
+even <- venneuler(c(Mussels=0.9, Environment=0.2, 
+                    "Mussels&Environment"=0.3))
+plot(even)
+
+SVar
+sven <- venneuler(c(Mussels=3.1, Chlorophylla=1.4, 
+                    "Mussels&Chlorophylla"=0.8))
+plot(sven)
+
+
+CCAres<-data.frame(scale=rep(c("Field","Enc","Shell"),each=3),
+                   Type=c("Location","Explained","Unexplained"),
+                   Value=c(6.276, 35.050, 71.226, 
+                           NA, 2.512, 97.488,
+                           NA, 5.151, 94.849))
+
+ggplot(CCAres[CCAres$scale=="Shell",],
+       aes(x = "", y = Value, fill = Type,label=Type)) +
+  geom_bar(stat = "identity", color = "white") +
+  geom_text_repel()+
+  coord_polar("y", start = 0)+theme_void()+
+  scale_fill_grey()+
+  theme(legend.position = "none")
+

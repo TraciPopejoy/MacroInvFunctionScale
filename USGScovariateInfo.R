@@ -75,7 +75,7 @@ FEn17Dis<-monsterDis %>%
 
 
 # Temperature Analysis ---------------------------------------------
-# 00010 is cfs daily mean
+# 00010 is water temperature, C
 # use readNWISdata to pull this data into R from USGS website
 # all times available
 temp12<-readNWISdata(site=c("07337900","07338500","07335790","07335700"), 
