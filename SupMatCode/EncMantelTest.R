@@ -84,3 +84,21 @@ ggplot(ERredF, aes(x=xc, y=yc, fill=invquant)) +
   ylab("Downstream               Upstream") + 
   xlab("North Bank             South Bank")
 ggsave("Figures/S1Mantelinvertbiomassenc.jpg", width=5, height=6)
+
+# CCA for Supplement --------------
+enc.envR<-CCAEnc.data[,c(1:8, 41:48)] %>% ungroup()%>%
+  left_join(ERredF[,c(1,19,20)], by=c("Enc2"="enc"))%>% 
+  mutate_if(is.numeric,scale) %>% 
+  #changing type into binary to reduce variable redundancy
+  mutate(Live=case_when(Type=="Control"~"No",
+                        Type=="Sham"~"No",
+                        Type=="Live"~"Yes")) 
+
+# run the cca
+cca.E.cond<-cca(enc.com~ACT+AMB+Live+
+             Discharge.cms+ChlAdensity+Dvar+Condition(xc+yc), enc.envR, scaling=2)
+
+vif.cca(cca.E.cond) #check for redundant environmental variables
+cca.E.cond
+ccaE.plot<-plot(cca.E)
+cca.E.sum<-summary(cca.E)

@@ -134,7 +134,7 @@ anova(cca.E, perm=1000) #run the anova-like permutations; its not significant
 
 # variation partitioning to look at mussel vs. environment importance
 EVar<-varpart(enc.com[,-10], ~ACT+AMB+Live, 
-              ~ChlAdensity+Discharge.cms,
+              ~ChlAdensity+Discharge.cms+Dvar,
               data=enc.env, chisquare = T, 
               permutations=1000)
 plot (EVar, digits = 2, Xnames = c('Mussel', 'Environ'), 
