@@ -47,7 +47,8 @@ testRate<-function(disCurve, discharge){
 # apply the function to each discharge measurement to figure % value that day
 monsterDis<-monster %>% rowwise() %>% 
   mutate(StreamCon=testRate(c(p05_va,p10_va,p20_va,p25_va,
-                              p50_va,p75_va,p80_va,p90_va,p95_va),X_00060_00003))
+                              p50_va,p75_va,p80_va,p90_va,p95_va),
+                            X_00060_00003))
 
 # summarize Stream Condition for each year
 # so this reports the % of time flow is above a certain flow
@@ -135,3 +136,33 @@ TempSumSeason<-temperature %>% group_by(Gage, Year, Season) %>%
 EncPC<-read_excel("../FEn17/FEn17_data/FieldEncDataSum2017V2.xlsx", 
                      sheet="Physical-Chem") 
 EncPC %>% filter(Date >"2017-09-17 00:00:00", Variable=="Temperature")
+
+# discharge range for field experiment
+supdis1<-monster %>% filter(Date>"2017-07-12" & Date < "2017-10-08",
+                           Gage=="Kiamichi@BigCedar") %>%
+  mutate(monthday=as.Date(julian(Date, as.Date("2017-01-01")), "2017-01-01"))
+supdis2<-monster %>% filter(Date>"2011-07-12" & Date < "2011-10-08",
+                            Gage=="Kiamichi@BigCedar")%>%
+  mutate(monthday=as.Date(julian(Date, as.Date("2011-01-01")), "2017-01-01"))
+bigced<-ggplot()+
+  geom_line(data=supdis1, aes(x=monthday, y=X_00060_00003*0.028316847, group=Gage), 
+            color="black")+
+  geom_path(data=supdis1, aes(x=monthday, y=p50_va*0.028316847, group=Gage), color="blue")+
+  geom_path(data=supdis1, aes(x=monthday, y=p75_va*0.028316847, group=Gage), color="darkblue")+
+  geom_path(data=supdis2, aes(x=monthday, y=X_00060_00003*0.028316847, group=Gage), color="red")+
+  geom_vline(xintercept = ymd("2017-10-07"), color="red",alpha=.3,cex=5)+
+  scale_y_continuous("Discharge (cms)",trans="log1p", breaks=c(0,1,2.5,5,10,15))+
+  scale_x_date("",date_breaks="2 weeks",date_labels="%b %d")+
+  theme(axis.title.x = element_text(size=-1))+theme_cowplot()
+bigced
+library(cowplot)
+#SiteDepth from spatialstatistics.R in FEn17 R project
+plot_grid(bigced, SiteDepth+theme_cowplot(), ncol=1,labels="AUTO")
+ggsave("Figures/SupExperimentFlow.tiff", width=6, height=5)
+
+
+max(supdis1$X_00060_00003)*0.028316847
+min(supdis1$X_00060_00003)*0.028316847
+max(supdis1$p50_va)*0.028316847
+max(supdis1$p75_va)*0.028316847
+

@@ -268,8 +268,10 @@ plot(sinv,2) #normality
 aov_residuals <- residuals(object = sinv )
 shapiro.test(x = aov_residuals ) 
 library(emmeans)
-sinvT<-emmeans(sinv,~ShellSpecies|Type) #object contains contrasts & sig
-CLD(sinvT, alpha=.05, Letters=letters) #letters on dif groups
+sinvT<-emmeans(sinv,~Type+ShellSpecies) #object contains contrasts & sig
+sinvT
+sinvp<-pwpp(sinvT, alpha=.05, Letters=letters) #letters on dif groups
+sinvp
 
 sric<-aov(richness~ShellSpecies*Type, data=S.Talpha)
 summary(sric)
