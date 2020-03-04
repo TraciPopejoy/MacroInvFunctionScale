@@ -261,9 +261,9 @@ MDat<-MusselData %>% full_join(TreatENC)%>%
          ShellSurArea.mm2=2*(L*H)+2*(L*W)+2*(H*W),
          corSA.mm2=case_when(Genus=="AMB"~ShellSurArea.mm2/1.750,
                              Genus=="ACT"~ShellSurArea.mm2/1.595),
-         SamID=paste(Enc2, ShellSpecies, sep=".")) %>%
+         SamID=paste(Enc2, ShellSpecies, sep="."))%>%
   group_by(Enc2,TreatA,SamID) %>% 
-  summarize(TShellSurArea.cm2=sum(corSA.mm2, na.rm=T)*.01)
+  summarize(TShellSurArea.cm2=sum(ShellSurArea.mm2, na.rm=T)*.01)
 #the ones with 0 I didn't measure height on them b/c not needed
 
 ## mussel biomass in each enclosure using tutorial from van Ee et al. (2020)
@@ -407,7 +407,8 @@ SCounts<-SInv %>% group_by(Enc2, ShellSpecies) %>%
   summarize(Nsam=n(),
             richness=length(unique(Taxa)))%>%
   mutate(SamID=paste(Enc2,ShellSpecies, sep="."))%>% full_join(MDat) %>%
-  mutate(InvertDensity.npcm2=Nsam/TShellSurArea.cm2) %>% full_join(TreatENC)
+  mutate(InvertDensity.npcm2=Nsam/TShellSurArea.cm2) %>% full_join(TreatENC) %>% 
+  filter(!is.na(InvertDensity.npcm2))
 
 # shell data community matrix in density; units are n/cm2
 S.ComDens<-SInv %>% group_by(Enc2, ShellSpecies, Taxa) %>% 

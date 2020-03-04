@@ -119,7 +119,7 @@ FIbm<-ggplot(F.Talpha, aes(x=Average.of.STDM..g.m.2., y=meanID.npm2))+
                 breaks=c(0, 200,300, 1000, 2000,3000,5000))+
   scale_x_continuous(trans="log1p", breaks=c(0,5,20,50,200),
                     name=expression("mussel biomass g"%.%"m"^-2))+
-  expand_limits(y=200)+
+  expand_limits(y=200)+theme_cowplot()+
   theme(axis.text.x = element_text(angle=30),
         axis.title.x=element_text(size=12)) #+geom_text_repel(aes(label=Reach), size=2)
 # from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
@@ -155,7 +155,6 @@ squish_trans <- function(from, to, factor) {
   return(trans_new("squished", trans, inv))
 }
 
-library(ggsci)
 EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",], 
               aes(x=sumBMall.g.m2, y=InvDensity.npm2))+
   geom_point(size=2, aes(shape=TreatFAC, fill=TreatFAC))+
@@ -176,9 +175,9 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
   scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
   scale_fill_manual(name="Treatment",
                      values=c("darkgrey","darkgrey","white","white","black"))+
-  theme(legend.position="none", axis.title.y=element_text(size=0))+
-  expand_limits(y=500)+
-  theme(axis.text.x = element_text(angle=30),
+  theme_cowplot()+expand_limits(y=500)+
+  theme(legend.position="none", axis.title.y=element_text(size=0),
+        axis.text.x = element_text(angle=30),
         axis.title.x=element_text(size=12))
 
 SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
@@ -192,19 +191,19 @@ SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
   scale_fill_manual(name="Shell Type", 
                     values=c("darkgrey","darkgrey","white","white"),
                     guide=F)+
-  theme(axis.title.y=element_text(size=0),
+  theme_cowplot()+
+  theme(axis.title.y=element_text(size=12),
         axis.text.x = element_text(angle=30),
         axis.title.x=element_text(size=12))+
-  expand_limits(x=250,y=50)
+  expand_limits(y=45)
 
-library(cowplot)
 legendBM<-get_legend(EIbm+
                       theme(legend.justification=c(0.5,0.5),
                             legend.position = c(.5,.6),
                             legend.direction = "horizontal"))
 bmplots<-plot_grid(SIbm, EIbm, FIbm, nrow = 1, labels="AUTO")
 plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
-ggsave("./Figures/MussAbundDec30.tiff",width=9, height=3.5)
+ggsave("./Figures/MussAbundM3TEST.svg",width=9, height=3.75)
 
 ##### Taxonomic Diversity Tests #####
 #Field - need to use a mixed model to account for space
@@ -263,7 +262,7 @@ E.Talpha %>% group_by(Type) %>% summarize(meanS=mean(SimpsonsI),
 sinv<-aov(InvDensity.npcm2~ShellSpecies*Type, data=S.Talpha)
 summary(sinv)
 plot(sinv, 1) #Homogeneity of variances
-leveneTest(log10(InvDensity.npcm2) ~ TreatA, data = S.Talpha)
+leveneTest(InvDensity.npcm2 ~ TreatA, data = S.Talpha)
 plot(sinv,2) #normality
 aov_residuals <- residuals(object = sinv )
 shapiro.test(x = aov_residuals ) 
@@ -272,6 +271,11 @@ sinvT<-emmeans(sinv,~Type+ShellSpecies) #object contains contrasts & sig
 sinvT
 sinvp<-pwpp(sinvT, alpha=.05, Letters=letters) #letters on dif groups
 sinvp
+
+sumInvShelld<-S.Talpha %>% group_by(Type, ShellSpecies) %>%
+  summarize(meanInv=mean(InvDensity.npcm2))
+.0474/(mean(.0252,.0245))
+.0284/(mean(.0252,.0245))
 
 sric<-aov(richness~ShellSpecies*Type, data=S.Talpha)
 summary(sric)
