@@ -1,5 +1,4 @@
 # CCA analysis =================================
-#### gsub("\\\\", "/", readClipboard())
 
 ##### Field Data Analysis ----------
 #Hypothesis: hydrology/temperature drives community structure
@@ -37,7 +36,7 @@ names(CCAField.data[,-c(1:7, 57:66)]) #identifying inverts
 field.com<-CCAField.data[,-c(1:7, 57:66)] 
 # isolate environmental variables and scale to z scores
 field.env<-CCAField.data[,c(1:7, 57:66)] %>%
-  select(-Year) %>% mutate_if(is.numeric,scale)
+  dplyr::select(-Year) %>% mutate_if(is.numeric,scale)
 
 #run the cca with all interesting environmental variables
 cca.F<-cca(field.com~`Average of STDM (g.m-2)`+Benthic_CHLA_MG.M2+
@@ -140,6 +139,12 @@ EVar<-varpart(enc.com[,-10], ~ACT+AMB+Live,
 plot (EVar, digits = 2, Xnames = c('Mussel', 'Environ'), 
       bg = c('navy', 'tomato'))
 
+### checking is benthic chlorophyll was similair among treatments
+ggplot(CCAEnc.data) + geom_boxplot(aes(x=TreatA, y=ChlAdensity))
+ggplot(CCAEnc.data) + geom_boxplot(aes(x=TreatA, y=Dvar))
+ggplot(CCAEnc.data) + geom_boxplot(aes(x=TreatA, y=Discharge.cms))
+
+
 ##### Shell Data Analysis --------------------------------
 #Hypothesis: Mussel spp/type begins to matter due to differencese 
 #            in habitat area and chlA abundance
@@ -198,6 +203,13 @@ SVar<-varpart(shell.com, ~ShellSpecies+Type,
               ~ChlAdensity,
               data=shell.env, chisquare = T, 
               permutations=1000)
+
+### checking if chlorophyll was different among shell types
+View(CCAS.data)
+chlShell<-lm(ChlAdensity ~ Type, data=CCAS.data)
+summary(chlShell)
+TukeyHSD(chlShell)
+ggplot(CCAS.data) +geom_boxplot(aes(x=Type, y=ChlAdensity))
 
 ##### CCA Plots ========================================
 #install.packages("devtools")

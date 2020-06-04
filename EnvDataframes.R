@@ -27,6 +27,20 @@ gagesites <- readNWISdata(site=c("07337900","07338500","07335790","07335700"),
                           service = "site")
 coordinates(gagesites)<-c("dec_long_va", "dec_lat_va")
 
+#figure out distances between points
+FieldSpData@data[,1:3]
+library(raster) #too lazy to code it up properly, brute force
+distancesbtwnR<-c('K7'=pointDistance(FieldSpData[1,], FieldSpData[2,],longlat=T),
+'KS'=pointDistance(FieldSpData[3,], FieldSpData[4,],longlat=T),
+'KT'=pointDistance(FieldSpData[5,], FieldSpData[6,],longlat=T),
+'L3'=pointDistance(FieldSpData[7,], FieldSpData[8,],longlat=T),
+'LY'=pointDistance(FieldSpData[9,], FieldSpData[10,],longlat=T),
+'K2'=pointDistance(FieldSpData[11,], FieldSpData[12,],longlat=T),
+'GL'=pointDistance(FieldSpData[13,], FieldSpData[14,],longlat=T))
+distancesbtwnR
+mean(distancesbtwnR);sd(distancesbtwnR)
+min(distancesbtwnR);max(distancesbtwnR)
+
 #Discharge ===========================
 FieldDischarge<-read_excel("./data/Field Discharge.xlsx") %>% 
   group_by(Reach, SamplingSeason) %>%
@@ -145,10 +159,10 @@ ggplot(peb.ENC.sum, aes(x=TreatA, y=Dvar))+geom_boxplot()
 Fenv.data<-FieldChlA %>% full_join(FieldDischarge) %>% 
   left_join(FieldSpData@data) %>%
   left_join(peb.wolfman) %>% mutate(Dvar=D60/D10) %>%
-  select(Reach,SamplingSeason,WC_CHLA_MG.L,Benthic_CHLA_MG.M2,
+  dplyr::select(Reach,SamplingSeason,WC_CHLA_MG.L,Benthic_CHLA_MG.M2,
          Discharge.cms,HUC8num,HUC12num,Dvar,D50,D90)
 
 Eenv.data<-EncChlAraw %>% left_join(EncDischarge) %>% 
   left_join(TreatENC) %>% left_join(peb.ENC.sum) %>%
-  select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
+  dplyr::select(TEid,Week,Enc2,TreatA,ChlAdensity,Discharge.cms,Type,Spp,
          Dvar, D50, D90)

@@ -2,11 +2,11 @@ source("InvDataframes.R")
 source("EnvDataframes.R")
 
 F.ComDens16<-F.ComDens %>% filter(SamplingSeason=="Fall2016")
-F.ComDens16 %>% select(-Year, -InvDensity.npm2R) %>% 
+F.ComDens16 %>% dplyr::select(-Year, -InvDensity.npm2R) %>% 
   summarise_if(is.numeric,list(sumT=sum)) %>%
   gather(variable, value) %>% arrange(desc(value))
 E.ComDens12<-E.ComDens %>% filter(Week=="w12")
-E.ComDens12 %>% ungroup()%>% select(-TEid) %>%
+E.ComDens12 %>% ungroup()%>% dplyr::select(-TEid) %>%
   summarise_if(is.numeric,list(sumT=sum)) %>%
   gather(variable, value) %>% arrange(desc(value))
 S.ComDens %>% ungroup()%>% 
@@ -22,18 +22,18 @@ sum(colSums(F.ComDens16[,-c(1:7,70:71)])>1) # total gamma diversity
 sum(colSums(F.ComDens16[F.ComDens16$Treatment!="MR",-c(1:7,70:71)])>1)
 #exploring watershed gamma diversity
 F.ComDens16 %>% 
-  select(-Year, -InvDensity.npm2R,-`Average of STDM (g.m-2)`) %>% 
+  dplyr::select(-Year, -InvDensity.npm2R,-`Average of STDM (g.m-2)`) %>% 
   mutate(WS=substr(Reach,1,1),
          WSR=case_when(WS=="K"~"Kiamichi",
                        T~"Little")) %>%
   group_by(WSR,Treatment) %>% 
   summarise_if(is.numeric,list(sumT=sum)) %>%
   gather(variable, value, -WSR, -Treatment) %>% 
-  filter(value!=0) %>% select(Treatment, WSR, variable) %>%
+  filter(value!=0) %>% dplyr::select(Treatment, WSR, variable) %>%
   group_by(WSR,Treatment) %>%tally()
 
 View(F.ComDens16 %>% 
-       select(-Year, -InvDensity.npm2R, -`Average of STDM (g.m-2)`) %>% 
+       dplyr::select(-Year, -InvDensity.npm2R, -`Average of STDM (g.m-2)`) %>% 
   mutate() %>%
   group_by(Treatment) %>%
   summarise_if(is.numeric,list(sumT=sum)) %>%
@@ -155,9 +155,12 @@ squish_trans <- function(from, to, factor) {
   return(trans_new("squished", trans, inv))
 }
 
+library(wesanderson)
+pal <- wes_palette("Zissou1", 4, type = "discrete")
 EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",], 
               aes(x=sumBMall.g.m2, y=InvDensity.npm2))+
-  geom_point(size=2, aes(shape=TreatFAC, fill=TreatFAC))+
+  geom_point(size=2, aes(shape=TreatFAC, fill=TreatFAC, 
+                         alpha=Type))+
   stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",], 
                aes(x=125, y=InvDensity.npm2),
                fun.data = mean_sdl, geom="linerange", 
@@ -172,9 +175,11 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
                      breaks=c(125,150,175,200,250,300),
                      labels=c("CTRL",150,175,200,250,300),
                      name=expression("mussel biomass g"%.%"m"^-2))+
+  scale_alpha_discrete(name="Treatment",
+                       range=c(1,0.6),guide=F)+
   scale_shape_manual(name="Treatment", values=c(23,24,23,24,21))+
   scale_fill_manual(name="Treatment",
-                     values=c("darkgrey","darkgrey","white","white","black"))+
+                     values=pal)+
   theme_cowplot()+expand_limits(y=500)+
   theme(legend.position="none", axis.title.y=element_text(size=0),
         axis.text.x = element_text(angle=30),
@@ -197,13 +202,28 @@ SIbm<-ggplot(S.Talpha, aes(x=TShellSurArea.cm2, y=InvDensity.npcm2*10000))+
         axis.title.x=element_text(size=12))+
   expand_limits(y=45)
 
+S.Talphatemp<-S.Talpha %>% mutate(TreatAF=fct_relevel(TreatA, c("ACTL","AMBL","ACTS","AMBS")))
+SIbmXX<-ggplot(S.Talphatemp, aes(x=TreatAF, y=InvDensity.npcm2*10000))+
+  geom_boxplot()+
+  scale_y_continuous(name=expression("individuals "%.%" m "^-2),
+                breaks=c(0,100,300,500,750, 1000))+
+  #scale_x_discrete(name="",breaks=c("ACTL","AMBL","ACTS","AMBS"),
+  #                 labels=c(expression(atop(italic(Actinonaias),"live")),
+  #                          expression(atop(italic(Amblema),"live")),
+  #                          expression(atop(italic(Actinonaias),"sham")),
+  #                          expression(atop(italic(Amblema),"sham"))))+
+  theme_cowplot()+
+  theme(axis.title.y=element_text(size=12),
+        axis.text.x=element_text(angle=30, hjust=1),
+        axis.title.x=element_text(size=12))
+
 legendBM<-get_legend(EIbm+
                       theme(legend.justification=c(0.5,0.5),
                             legend.position = c(.5,.6),
                             legend.direction = "horizontal"))
-bmplots<-plot_grid(SIbm, EIbm, FIbm, nrow = 1, labels="AUTO")
+bmplots<-plot_grid(SIbmXX, EIbm, FIbm, nrow = 1, labels="AUTO")
 plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
-ggsave("./Figures/MussAbundM3TEST.svg",width=9, height=3.75)
+ggsave("./Figures/MussAbundapt13.svg",width=9, height=3.75)
 
 ##### Taxonomic Diversity Tests #####
 #Field - need to use a mixed model to account for space
@@ -237,6 +257,8 @@ leveneTest(log10(InvDensity.npm2) ~ TreatA, data = E.Talpha)
 plot(einv,2) #normality
 aov_residuals <- residuals(object = einv )
 shapiro.test(x = aov_residuals ) #not normal, should remove 38, 41, and 9?
+
+summary(lm(log10(InvDensity.npm2)~sumBMall.g.m2, data=E.Talpha))
 
 eric<-aov(log(richness)~TreatA, data=E.Talpha)
 summary(eric)
@@ -322,6 +344,8 @@ S.TalphaS<-S.Talpha %>% group_by(ShellSpecies,Type) %>%
 tab1<-rbind(F.TalphaS, E.TalphaS, S.TalphaS)
 write.csv(tab1, "Table1.InvertBasics.csv")
 
+
+### OLD CODE ###########################
 # looking at Chironomids --------
 head(CCAField.data)
 fchl<-ggplot(CCAField.data, aes(Benthic_CHLA_MG.M2, Dip.ChironomidaeL))+
