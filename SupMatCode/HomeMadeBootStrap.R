@@ -3,25 +3,25 @@
 # 		run a CCA and pull relevant metrics
 # 		make plots that describe variation in CCA results from variation at Surber level
 
+# taxa match averaged field com data but each row is a surber sample
+F.ComDens.surbers<-samp2016count %>%
+  filter(!(Taxa %in% c(empty_col_field, tax_rare_field$taxa,
+                       'Biv.Unionidae', #don't care about these
+                       'Entom.Isotomidae', 'Other.other',
+                       'Isopoda.miscI', 'Dip.Other'))) 
 
 # For Loop for bootstrap -------------------------------------
 set.seed(5432) #want a reproducible result
 sumdataT<-NULL #create empty dataframe for CCA results (Constrained % etc.)
 ANO<-NULL #create a different dataframe for ordistep reulsts
-spDat1<-data.frame(rowname=unique(samp2016count$Taxa)) #start a dataframe for sp on CCA1
-spDat2<-data.frame(rowname=unique(samp2016count$Taxa)) #start a dataframe for sp on CCA2
+spDat1<-data.frame(rowname=unique(F.ComDens.surbers$Taxa)) #start a dataframe for sp on CCA1
+spDat2<-data.frame(rowname=unique(F.ComDens.surbers$Taxa)) #start a dataframe for sp on CCA2
 for(k in 1:1000) {
 	#create a dataframe that has one surber sample for reach, randomly chosen
-  surbsamp<-samp2016count %>% 
+  surbsamp<-F.ComDens.surbers %>% 
   spread(Taxa, Count) %>% 
     filter(SamplingSeason == "Fall2016")%>%
-    dplyr::select(-SamplingSeason, 
-                  -Hem.Gerridae,
-                  -Dip.Chaoboridae,#only in 1
-                  -Dip.Orthorrhaphous, -Dip.Thaumaleidae, -Lep.Pyralidae, #only in 1
-                  #-Neu.Sisyridae,-Col.Hydrophilidae,-Dip.Tupulidae, #only in 2
-                  #-Tri.Odontoceridae, -`FLAT WORMS`, #only in 2 samples
-                  -Biv.Unionidae) %>% #don't care about these
+    dplyr::select(-SamplingSeason) %>% #don't care about these
     replace(is.na(.),0) %>%
     mutate(Reach=substr(Sample, 1,5),
            Site=substr(Sample, 1,2),
@@ -32,7 +32,7 @@ for(k in 1:1000) {
   # join this new dataframe with environment to pair species with environment	
   sampdf<-surbsamp %>% left_join(field.env, by="Reach")
   # run the CCA on this new dataframe
-  cca.samp<-cca(sampdf[,-c(1:4,55:69)]~`Average of STDM (g.m-2)`+
+  cca.samp<-cca(sampdf[,-c(1:4,50:64)]~`Average of STDM (g.m-2)`+
                   Benthic_CHLA_MG.M2+ Discharge.cms+Dvar+
                   Condition(HUC12num), sampdf, scaling=2)
   ss<-summary(cca.samp) #save summary of CCA results
@@ -54,7 +54,7 @@ for(k in 1:1000) {
   spDat2<-left_join(spDat2, rownames_to_column(as.data.frame(ss$species[,2])), by="rowname")
   
   #run the null global model to determine which variables to add during ordistep
-  cca.samp0<-cca(sampdf[,-c(1:4,55:69)]~1+Condition(HUC12num), sampdf, scaling=2)
+  cca.samp0<-cca(sampdf[,-c(1:4,50:64)]~1+Condition(HUC12num), sampdf, scaling=2)
   an<-anova(cca.samp) #if the global model is significant, can do forward model selection
   #run ordistep to see which variables are significant and add information
   if(an$`Pr(>F)`[1] < 0.05 ) {
@@ -79,16 +79,24 @@ for(k in 1:1000) {
 } 
 head(sumdataT) #see the CCA summary stats
 # determine % inertia explained descriptive statistics (mean, sd, median)
-(Keep<-sumdataT %>% select(-run, 
-                          -X.Average.of.STDM..g.m.2..,-Benthic_CHLA_MG.M2,
-                          -Discharge.cms,-Dvar,-Discharge.cms.1,-Dvar.1,
-                          -X.Average.of.STDM..g.m.2...1,-Benthic_CHLA_MG.M2.1) %>%
+(Keep<-sumdataT %>% as_tibble() %>%
+    dplyr::select(-run, -X.Average.of.STDM..g.m.2..,-Benthic_CHLA_MG.M2,
+           -Discharge.cms,-Dvar,-Discharge.cms.1,-Dvar.1,
+           -X.Average.of.STDM..g.m.2...1,-Benthic_CHLA_MG.M2.1) %>%
     mutate(perconstraint=ss.constr.chi/ss.tot.chi*100,
            perunconstrain=ss.unconst.chi/ss.tot.chi*100,
            perpartial=ss.partial.chi/ss.tot.chi*100) %>%
-    select(-ss.constr.chi, -ss.unconst.chi, -ss.partial.chi) %>%
+    dplyr::select(-ss.constr.chi, -ss.unconst.chi, -ss.partial.chi) %>%
   summarise_if(is.numeric, .funs=c(mean,sd, median)))
 write_csv(sumdataT, "bootstrappedCCAres.csv") #save this so I don't have to run it
+
+sumdataT %>% 
+  dplyr::select(X.Average.of.STDM..g.m.2..:Dvar.1) %>%
+  summarize_all(mean)
+
+sumdataT %>% 
+  dplyr::select(X.Average.of.STDM..g.m.2..:Dvar.1) %>%
+  summarize_all(sd)
 
 head(ANO) #see the results from ordisteps
 # look at which variables are most common and the average p
@@ -99,7 +107,8 @@ ANO %>% group_by(var) %>%
 # look at which variables were considered most important (chosen first)
 ANO %>% group_by(run) %>% slice(1) %>% 
   ungroup() %>% group_by(var) %>% summarize(countvar=n()) %>% 
-  arrange(desc(countvar)) 
+  arrange(desc(countvar)) %>%
+  mutate(per_firstsig=countvar/sum(countvar)*100)
 write_csv(ANO, "bootstrappedmodelselect.csv")
 
 # which taxa had the lowest and highest loadings on CCA1 respectively
@@ -119,7 +128,7 @@ cc2thigh<-spDat2 %>% column_to_rownames() %>% rowMeans(na.rm=T) %>%
 # environmental loadings on each axis
 # dataframe for graphing
 BootEnvGraphD<-sumdataT %>% 
-  select(run, X.Average.of.STDM..g.m.2..,Benthic_CHLA_MG.M2,Discharge.cms,Dvar,
+  dplyr::select(run, X.Average.of.STDM..g.m.2..,Benthic_CHLA_MG.M2,Discharge.cms,Dvar,
          X.Average.of.STDM..g.m.2...1, Benthic_CHLA_MG.M2.1, Discharge.cms.1, Dvar.1) %>%
   gather(Variable, value, -run) %>%
   mutate(axis=case_when(Variable %in% c("X.Average.of.STDM..g.m.2..",
@@ -132,7 +141,8 @@ BootEnvGraphD<-sumdataT %>%
                          substr(Variable,1,4)=="Bent"~"Chl.a",
                          substr(Variable,1,4)=="Disc"~"Discharge",
                          substr(Variable,1,4)=="Dvar"~"Substrate")) %>%
-  group_by(run, Label) %>% select(-Variable) %>% spread(axis, value)
+  group_by(run, Label) %>% 
+  dplyr::select(-Variable) %>% spread(axis, value)
   
 # getting the means to add to the graph  
 BootEnvGraphSum<- BootEnvGraphD %>% group_by(Label) %>%
@@ -169,7 +179,7 @@ colnames(spDat2) <- c("Taxa", seq(1:1000))#renaming these nightmare of a datafra
 #building a long data for CCA2
 BootSpGraph2<-spDat2 %>% group_by(Taxa) %>% gather(run, value,-Taxa) %>% 
   mutate(axis="CCA2")
- #joining both CCA1 and CCA2 to creat the long dataframe
+ #joining both CCA1 and CCA2 to create the long dataframe
 BootSpGraph<-rbind(BootSpGraph1, BootSpGraph2) %>% group_by(run, Taxa) %>%
   spread(axis, value) %>%
   filter(Taxa %in% c(cc1thigh,cc1tlow,cc2thigh, cc2tlow)) %>% 

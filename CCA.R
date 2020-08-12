@@ -1,4 +1,6 @@
 # CCA analysis =================================
+source('InvDataframes.R')
+source('EnvDataframes.R')
 
 ##### Field Data Analysis ----------
 #Hypothesis: hydrology/temperature drives community structure
@@ -6,44 +8,47 @@
 # mussels should be correlated with discharge though
 
 # which taxa to remove because rare
-#14 samples, 3% samples is 1.4
+#14 samples, 3% samples is 0.42
 #so removing taxa only found in 1 samples
 
 # what are my least abundant taxa
-F.ComDens[,-c(1:7)] %>% filter(SampSeaF=="Fall2016") %>%
-  gather(taxa,den) %>% filter(den!=0) %>%
-  group_by(taxa) %>% tally() %>% arrange(n)
+tax_rare_field<-F.ComDens[,-c(1:7)] %>% 
+  filter(SampSeaF=="Fall2016") %>% #only looking at 2016
+  gather(taxa,den) %>% 
+  filter(den!=0) %>%
+  group_by(taxa) %>% 
+  tally() %>% 
+  arrange(n) %>%
+  filter(n<=1)
+empty_col_field<-names(which(colSums(F.ComDens16[,-c(1:7, 70:71)])==0))
+
 
 #only including Fall data to avoid psuedoreplication
-CCAField.data<-F.ComDens %>% left_join(Fenv.data) %>% 
+CCAField.data<-F.ComDens %>% 
+  left_join(Fenv.data, by=c("Reach", "SamplingSeason")) %>% 
   filter(SamplingSeason=="Fall2016") %>%
   #removing rare taxa
-  dplyr::select(-Hymenoptera.miscH,-Dip.Ascillidae, -Hem.Corixidae,#not in dataset
-                -Hem.Gerridae,-Hydrozoans.miscH,
-                -Dip.Chaoboridae,#only in 1
-                -Dip.Orthorrhaphous, -Dip.Thaumaleidae, -Lep.Pyralidae, #only in 1
-                #-Neu.Sisyridae,-Col.Hydrophilidae,-Dip.Tupulidae, #only in 2
-                #-Tri.Odontoceridae, -`FLAT WORMS`, #only in 2 samples
+  dplyr::select(-all_of(empty_col_field), #taxa with no observations (empty col)
+                -all_of(tax_rare_field$taxa), # taxa only found in 1 site
                 -Biv.Unionidae, #don't care about these
-                -Entom.Isotomidae, -Other.other,-Isopoda.miscI) #terrestrials 
+                -Entom.Isotomidae, -Other.other,-Isopoda.miscI, -Dip.Other) #terrestrials 
 #replacing na in mussel weight with 0
 CCAField.data$`Average of STDM (g.m-2)`<-replace_na(CCAField.data$`Average of STDM (g.m-2)`,0) 
 #View(CCAField.data) #check it matches environment
 
-names(CCAField.data[,-c(1:7, 57:66)]) #identifying inverts
+names(CCAField.data[,-c(1:7, 53:62)]) #identifying inverts
 
 # isolate community data and DONT transform bc cca uses chisquare
-field.com<-CCAField.data[,-c(1:7, 57:66)] 
+field.com<-CCAField.data[,-c(1:7, 53:62)] 
 # isolate environmental variables and scale to z scores
-field.env<-CCAField.data[,c(1:7, 57:66)] %>%
-  dplyr::select(-Year) %>% mutate_if(is.numeric,scale)
+field.env<-CCAField.data[,c(1:7, 53:62)] %>%
+  dplyr::select(-Year)
 
 #run the cca with all interesting environmental variables
 cca.F<-cca(field.com~`Average of STDM (g.m-2)`+Benthic_CHLA_MG.M2+
              Discharge.cms+Dvar+Condition(HUC12num), field.env, scaling=2)
-
 cca.F #see the results
-vif.cca(cca.F) # values over 10 mean redundant environmental varialbe
+vif.cca(cca.F) # values over 10 mean redundant environmental variable
 ccaF.plot<-plot(cca.F) # default plot
 cca.F.sum<-summary(cca.F) #look at the summary of cca results
 #how much variation each CCA contributes to constraint variation explained
@@ -62,14 +67,6 @@ finalF<-ordistep(cca.F0,scope=formula(cca.F), direction="both") #complete forwar
 finalF$anova$padj <- p.adjust (finalF$anova$`Pr(>F)`, method = 'holm', n = 4) #determine holm adjusted p value for multiple tests
 finalF$anova #resulting best model with p values
 
-# use variation partitioning to investigate influence of mussel and/or/both environment on macroinverts
-FVar<-varpart(field.com[,-c(7,13,22)], ~`Average of STDM (g.m-2)`, 
-        ~Benthic_CHLA_MG.M2+Discharge.cms+Dvar,
-        data=field.env, chisquare = T, 
-        permutations=1000)
-plot (FVar, digits = 2, Xnames = c('Mussel', 'Environ.'), 
-      bg = c('navy', 'tomato'))
-
 ###### Enclosure Data Analysis -------------------------
 #Hypothesis: Mussels biomass drives com structure, but little difference between sp
 #Predict: MusselBM explains most variation, followed by chlA abun
@@ -78,33 +75,33 @@ plot (FVar, digits = 2, Xnames = c('Mussel', 'Environ.'),
 #50 samples, 4% samples is 2
 #so removing taxa only found in 2 samples
 #what are my rare species
-(tax<-E.ComDens[,-c(1,2,4:8)] %>% filter(Week=="w12") %>%
+tax_rare_enc<-E.ComDens[,-c(1,2,4:8)] %>% filter(Week=="w12") %>%
   gather(taxa,den) %>% filter(den!=0) %>%
-  group_by(taxa) %>% tally() %>% arrange(n))
+  group_by(taxa) %>% tally() %>% arrange(n) %>%
+  filter(n<=2)
+empty_col_enc<-names(which(colSums(E.ComDens12[,-c(1:8)])==0))
 
 #build dataset with species and environment data while removing rare species
 CCAEnc.data<-E.ComDens %>% left_join(Eenv.data)%>% 
   left_join(MusBioG)%>%
-  dplyr::select(-Col.Myst, -Col.Gyrinidae,-Dip.Ceratopogonidae,
-                -Tri.Pupa, -MysteryTricoptera,#not in data
-                -Col.Hydrophilidae, -Col.Staphylinidae,#only in 1
-                -Eph.Baetidae, -Gas.Physidae, -Gas.Planorbidae,
-                -Hemiptera, -Ostracoda,#only in 1
-                -Sisyridae, -Eph.Myst, #only in 2
-                -Entom.Isotomidae,-Isopoda.miscI,#terrestrials 
+  dplyr::select(-all_of(empty_col_enc), #empty columns
+                -all_of(tax_rare_enc$taxa), #rare taxa
+                -Entom.Isotomidae,-Isopoda.miscI, -Dip.Other, #terrestrials 
                 -Treatment) %>% 
   filter(!is.na(ChlAdensity)) %>% #remove instances were I don't have chlorophyll a
   filter(Week=="w12") #only considering week 12
-CCAEnc.data[is.na(CCAEnc.data$ACT),46:47]<-0 #control treatments have 0 mussel biomass
+
+
+CCAEnc.data[is.na(CCAEnc.data$ACT),44:45]<-0 #control treatments have 0 mussel biomass
 CCAEnc.data <- CCAEnc.data %>%  mutate(TMusBM=ACT+AMB) #calculating total mussel biomass
 CCAEnc.data[!is.na(CCAEnc.data$ChlAdensity) &
               CCAEnc.data$ChlAdensity<=0,"ChlAdensity"]<-0 #replacing negative chla values with 0
 
-names(CCAEnc.data[,-c(1:8,41:48)]) #names of invertebrates
+names(CCAEnc.data[,-c(1:8,39:46)]) #names of invertebrates
 # isolate community data and NOT transform bc cca uses chisquare dist
-enc.com<-CCAEnc.data[,-c(1:8, 41:48)] 
+enc.com<-CCAEnc.data[,-c(1:8,39:46)] 
 # isolate environmental variables and scale to z scores
-enc.env<-CCAEnc.data[,c(1:8, 41:48)] %>% ungroup()%>%
+enc.env<-CCAEnc.data[,c(1:8,39:46)] %>% ungroup()%>%
   #left_join(EnclosureRaster[,c(1,3,4)], by=c("Enc2"="enc"))%>% 
   mutate_if(is.numeric,scale) %>% 
   #changing type into binary to reduce variable redundancy
@@ -130,14 +127,6 @@ CCAE.impsp<-data.frame(CCA1.high=names(sort(cca.E.sum$species[,1],decreasing=T)[
 cca.E.sum$constr.chi/cca.E.sum$tot.chi*100 #percentage contrained inertia
 
 anova(cca.E, perm=1000) #run the anova-like permutations; its not significant
-
-# variation partitioning to look at mussel vs. environment importance
-EVar<-varpart(enc.com[,-10], ~ACT+AMB+Live, 
-              ~ChlAdensity+Discharge.cms+Dvar,
-              data=enc.env, chisquare = T, 
-              permutations=1000)
-plot (EVar, digits = 2, Xnames = c('Mussel', 'Environ'), 
-      bg = c('navy', 'tomato'))
 
 ### checking is benthic chlorophyll was similair among treatments
 ggplot(CCAEnc.data) + geom_boxplot(aes(x=TreatA, y=ChlAdensity))
@@ -198,12 +187,6 @@ finalS<-ordistep(cca.S0,scope=formula(cca.S), direction="both")
 finalS$anova$padj <- p.adjust (finalS$anova$`Pr(>F)`, method = 'holm', n = 3)
 finalS$anova
 
-#variation partitioning for influence of mussels and/or/both environment on macroinv community
-SVar<-varpart(shell.com, ~ShellSpecies+Type, 
-              ~ChlAdensity,
-              data=shell.env, chisquare = T, 
-              permutations=1000)
-
 ### checking if chlorophyll was different among shell types
 View(CCAS.data)
 chlShell<-lm(ChlAdensity ~ Type, data=CCAS.data)
@@ -214,7 +197,10 @@ ggplot(CCAS.data) +geom_boxplot(aes(x=Type, y=ChlAdensity))
 ##### CCA Plots ========================================
 #install.packages("devtools")
 #devtools::install_github("gavinsimpson/ggvegan")
-library(ggvegan); library(ggrepel)
+library(ggvegan); library(ggrepel); library(cowplot)
+
+cow<-theme_cowplot()
+theme_set(cow)
 # Field Plot ----------------------------------
 tidy.ccaF<-fortify(cca.F) #make me a single long dataframe
 tidy.ccaFSp<-tidy.ccaF %>% filter(Score=="species") %>% #species dataframe
@@ -247,8 +233,8 @@ FieldCCA<-ggplot()+
                arrow = arrow(length = unit(0.0, "cm")), alpha=.7)+
   scale_x_continuous(name="CCA 1 : 35.7%")+
   scale_y_continuous(name="CCA 2 : 10.6%") +
-  scale_color_manual(values=c("red","black")) +
-  scale_size_manual(values=c(3.5,2.8)) #changing label sizes
+  scale_color_manual(values=c("red","black"), guide=F) +
+  scale_size_manual(values=c(3.5,2.8), guide=F) #changing label sizes
 FieldCCA
 
 # Enclosure Plot -------------------------------
@@ -257,8 +243,9 @@ tidy.ccaE<-fortify(cca.E) #long dataframe of CCA results
 tidy.ccaESp<-tidy.ccaE %>% filter(Score=="species") %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
 #dataframe of important species
-tidy.ccaEspespe<-tidy.ccaE %>% filter(Score=="species",
-                                  Label %in% unique(c(t(CCAE.impsp)))) %>%
+tidy.ccaEspespe<-tidy.ccaE %>% 
+  filter(Score=="species",
+         Label %in% unique(c(t(CCAE.impsp)))) %>%
   left_join(FTaxaTable, by=c('Label'='Taxa'))
 #dataframe of environmental contraints
 tidy.ccaEcon<-tidy.ccaE %>% filter(Score!="species",
@@ -352,10 +339,9 @@ ggplot()+
                              color=Score))+
   geom_text_repel(data=tidy.ccaSSp, aes(x=CCA1,y=CCA2, label=Tlabel))+
   scale_color_manual(values=c("red","blue"), guide=F)
-  
-# CCA with all text plot ---------------------------------
-library(cowplot)
 
+
+# CCA with all text plot ---------------------------------
 FCCA_atext<-FieldCCA+
   geom_text_repel(data=frep, aes(x=CCA1,y=CCA2, #label everything
                                label=Tlabel, color=Score, size=Score),
@@ -381,7 +367,7 @@ ggsave("./Figures/CCAplotsAllText.tiff", width=11, height=4)
 FCCA_sp<-FieldCCA+
   geom_text_repel(data=frep[frep$Score=="species",], 
                   aes(x=CCA1,y=CCA2, #label the imp. species
-                      label=Tlabel),size=3)
+                      label=Tlabel),size=3, parse=T)
 
 ECCA_sp<-EncCCA + 
   geom_text_repel(data=erep[erep$Score=="species",], 

@@ -2,33 +2,29 @@ library(tidyverse); library(readxl)
 ### covariables - environment and spatial
 # Spatial Information =================
 FieldSpData<-read_excel("./data/HotSpotLocations.xlsx") %>% 
-  mutate(Reach=paste(SiteID, Treatment, sep="-")) %>% dplyr::select(-`Drainage - HUC 8`)
-library(sp)
-coordinates(FieldSpData)<-c("Longitude","Latitude")
-plot(FieldSpData, col="white")
-text(FieldSpData, labels=FieldSpData$SiteID)
+  mutate(Reach=paste(SiteID, Treatment, sep="-")) %>% 
+  dplyr::select(-`Drainage - HUC 8`)
 
 # HUC12 (or HUC8) for spatial autocorrelation 
-library(rgdal)
-SEOKhu12<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU12")
-SEOKhu8<- readOGR(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU8")
+library(sf)
+SEOKhu12<- read_sf(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU12")
+SEOKhu8<- read_sf(dsn="C:/Users/Owner/Documents/GISfile/SEOkNHD/Shape", layer="WBDHU8")
 
-proj4string(FieldSpData) <- proj4string(SEOKhu12)
-FieldSpData$HUC12 <- as.character(over(FieldSpData, SEOKhu12)$HUC12)
-#plot(SEOKhu12[SEOKhu12$HUC12 %in% FieldSpData$HUC12,])
-#text(FieldSpData, labels=FieldSpData$SiteID)
-FieldSpData$HUC8 <- as.character(over(FieldSpData, SEOKhu8)$HUC8)
-#plot(SEOKhu8[SEOKhu8$HUC8 %in% FieldSpData$HUC8,])
-#text(FieldSpData, labels=FieldSpData$SiteID)
-FieldSpData$HUC12num<-as.numeric(paste(FieldSpData$HUC12)) 
-FieldSpData$HUC8num<-as.numeric(paste(FieldSpData$HUC8)) 
+FieldSpData<-st_as_sf(FieldSpData, 
+                      coords = c('Longitude', 'Latitude'), 
+                      crs=st_crs(SEOKhu12))
+FieldSpData<-st_join(FieldSpData, SEOKhu8 %>% dplyr::select(HUC8, NAME)) %>%
+  st_join(SEOKhu12 %>% dplyr::select(HUC12)) %>%
+  mutate(HUC12num=as.numeric(paste(HUC12)),
+         HUC8num=as.numeric(paste(HUC8)))
+
 library(dataRetrieval)
 gagesites <- readNWISdata(site=c("07337900","07338500","07335790","07335700"), 
                           service = "site")
 coordinates(gagesites)<-c("dec_long_va", "dec_lat_va")
 
 #figure out distances between points
-FieldSpData@data[,1:3]
+FieldSpData[,1:3]
 library(raster) #too lazy to code it up properly, brute force
 distancesbtwnR<-c('K7'=pointDistance(FieldSpData[1,], FieldSpData[2,],longlat=T),
 'KS'=pointDistance(FieldSpData[3,], FieldSpData[4,],longlat=T),
@@ -47,7 +43,7 @@ FieldDischarge<-read_excel("./data/Field Discharge.xlsx") %>%
   summarize(Discharge.cms=mean(`Discharge (M3/s)`, na.rm=T))
 ####suplementing values find a better way! ###
 #based on F16 data from respective reach (or S16 for L3)
-FieldDischarge %>% left_join(FieldSpData@data) %>%
+FieldDischarge %>% left_join(FieldSpData %>% as_tibble()) %>%
   filter(SamplingSeason=="Fall2016") %>%
   ungroup() %>% group_by(River,`USGS gage Identifier`)%>%
   summarize(median(Discharge.cms), IQR(Discharge.cms))
@@ -157,7 +153,7 @@ ggplot(peb.ENC.sum, aes(x=TreatA, y=Dvar))+geom_boxplot()
 # Summary =========
 #joined data frames
 Fenv.data<-FieldChlA %>% full_join(FieldDischarge) %>% 
-  left_join(FieldSpData@data) %>%
+  left_join(FieldSpData %>% as_tibble()) %>%
   left_join(peb.wolfman) %>% mutate(Dvar=D60/D10) %>%
   dplyr::select(Reach,SamplingSeason,WC_CHLA_MG.L,Benthic_CHLA_MG.M2,
          Discharge.cms,HUC8num,HUC12num,Dvar,D50,D90)

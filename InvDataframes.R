@@ -258,12 +258,12 @@ lm(ShellSurArea.mm2~SA:Genus, data=SAcheck) #species specific regression
 MDat<-MusselData %>% full_join(TreatENC)%>% 
   dplyr::select(Enc2,Genus, TreatA, Type,Spp,L, H,W) %>% 
   mutate(ShellSpecies=recode(Genus, "AMBL"="AMB", "ACT"="ACT"),
-         ShellSurArea.mm2=2*(L*H)+2*(L*W)+2*(H*W),
+         ShellSurArea.mm2=2*(L*H+L*W+H*W),
          corSA.mm2=case_when(Genus=="AMB"~ShellSurArea.mm2/1.750,
                              Genus=="ACT"~ShellSurArea.mm2/1.595),
          SamID=paste(Enc2, ShellSpecies, sep="."))%>%
   group_by(Enc2,TreatA,SamID) %>% 
-  summarize(TShellSurArea.cm2=sum(ShellSurArea.mm2, na.rm=T)*.01)
+  summarize(TShellSurArea.cm2=sum(ShellSurArea.mm2, na.rm=T)/100)
 #the ones with 0 I didn't measure height on them b/c not needed
 
 ## mussel biomass in each enclosure using tutorial from van Ee et al. (2020)

@@ -1,6 +1,8 @@
 source("InvDataframes.R")
 source("EnvDataframes.R")
 
+# builds the subset of datasets used for Dubose et al. 2020
+# only looking at Fall 2016 for consistency 
 F.ComDens16<-F.ComDens %>% filter(SamplingSeason=="Fall2016")
 F.ComDens16 %>% dplyr::select(-Year, -InvDensity.npm2R) %>% 
   summarise_if(is.numeric,list(sumT=sum)) %>%
@@ -16,7 +18,6 @@ S.ComDens %>% ungroup()%>%
 # Gamma & Alpha Diversity --------
 
 # Field Data
-#head(F.ComDens)
 sum(colSums(F.ComDens16[,-c(1:7,70:71)])>1) # total gamma diversity
 #gamma diversity without mussel beds
 sum(colSums(F.ComDens16[F.ComDens16$Treatment!="MR",-c(1:7,70:71)])>1)
@@ -30,17 +31,9 @@ F.ComDens16 %>%
   summarise_if(is.numeric,list(sumT=sum)) %>%
   gather(variable, value, -WSR, -Treatment) %>% 
   filter(value!=0) %>% dplyr::select(Treatment, WSR, variable) %>%
-  group_by(WSR,Treatment) %>%tally()
+  group_by(WSR,Treatment) %>% tally()
 
-View(F.ComDens16 %>% 
-       dplyr::select(-Year, -InvDensity.npm2R, -`Average of STDM (g.m-2)`) %>% 
-  mutate() %>%
-  group_by(Treatment) %>%
-  summarise_if(is.numeric,list(sumT=sum)) %>%
-  gather(variable, value, -Treatment) %>% 
-  arrange(value) %>% filter(value==0) %>%
-  spread(variable, value))
-
+# calculating alpha diversity
 F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
            richness=specnumber(F.ComDens16[,-c(1:7, 70:71)]),
            SimpsonsI=diversity(F.ComDens16[,-c(1:7,70:71)], "simpson")) %>%
@@ -50,22 +43,15 @@ F.Talpha<-data.frame(F.ComDens16[,c(1:7)],
             meanSimp=mean(SimpsonsI)) %>%
   mutate(TreatFAC=factor(Treatment, levels=c("NM","MR"))) %>%
   left_join(FieldSpData@data)
-mean(F.Talpha$meanR);sd(F.Talpha$meanR)
-ggplot(F.Talpha, aes(x=Treatment, y=meanSimp))+
-  geom_boxplot(fill="grey")+#facet_wrap(~Season)+
-  ylab("Simpson Diversity Index")
-ggplot(F.Talpha, aes(x=Treatment, y=meanR))+
-  geom_boxplot(fill="grey")+#facet_wrap(~Season)+
-  ylab("Richness")
+mean(F.Talpha$meanR);sd(F.Talpha$meanR) #richness mean and sd
 FIn<-ggplot(F.Talpha, aes(x=TreatFAC, y=meanID.npm2))+
   geom_boxplot(fill="grey")+
   scale_y_log10(name=expression("individuals "%.%" m "^-2))+
   scale_x_discrete(name="Treatment",
                    labels=c("Control\nReach","Mussel\nReach"))
 
-#Enclosure Data
-#head(E.ComDens)
-sum(colSums(E.ComDens12[,-c(1:8)])>0.1) #gamma diversity?
+# Enclosure Data
+sum(colSums(E.ComDens12[,-c(1:8)])>0.1) #gamma diversity
 
 E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
                      InvDensity.npm2=rowSums(E.ComDens12[,-c(1:8)]),
@@ -78,39 +64,34 @@ E.Talpha<-data.frame(E.ComDens12[,c(1:8)],
                                              'A.ligamentina\nSham',
                                              'A.plicata\nLive',
                                              'A.plicata\nSham')))
-ggplot(E.Talpha, aes(x=TreatA, y=SimpsonsI))+
-  geom_boxplot(fill="grey")#+facet_wrap(~Week)
-ggplot(E.Talpha, aes(x=TreatA, y=richness))+
-  geom_boxplot(fill="grey")#+facet_wrap(~Week)
 EIn<-ggplot(E.Talpha, aes(x=TreatFAC, y=InvDensity.npm2))+
   geom_boxplot(fill="grey")+
   scale_y_log10(name=expression("Invertebrate # m "^-2))+
   scale_x_discrete(name="Treatment")+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
-#Shell Data
-#head(E.ComDens)
-sum(colSums(S.ComDens[,-c(1:7)])>0) #gamma diversity?
+# Shell Data
+sum(colSums(S.ComDens[,-c(1:7)])>0) #gamma diversity
 
 S.Talpha<-data.frame(S.ComDens[,c(1:7)],
                      InvDensity.npcm2=rowSums(S.ComDens[,-c(1:7)]),
                      richness=specnumber(S.ComDens[,-c(1:7)]),
                      SimpsonsI=diversity(S.ComDens[,-c(1:7)], "simpson")) %>%
   left_join(ShellChl)
-ggplot(S.Talpha, aes(x=TreatA, y=SimpsonsI))+
-  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")
-ggplot(S.Talpha, aes(x=TreatA, y=richness))+
-  geom_boxplot(fill="grey")+facet_wrap(~SheType, scales="free_x")
+
 SIn<-ggplot(S.Talpha, aes(x=SheType, y=InvDensity.npcm2*10000))+
   geom_boxplot(fill="grey")+
   scale_y_log10(name=expression("individuals "%.%" m "^-2),)+
   scale_x_discrete(name="Treatment", labels=c('Actinonaias\nLive','Actinonaias\nSham',
                                               'Amblema\nLive','Amblema\nSham'))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+# Figure of invert density at each treatment level (boxplot) 
 library(cowplot)
 plot_grid(FIn,EIn,SIn, nrow=1,labels="AUTO")
 ggsave("./Figures/AbundTreat.tiff",width=10, height=4)
 
+# Figure 1 of DuBose et al. 2020 manuscript
 FIbm<-ggplot(F.Talpha, aes(x=Average.of.STDM..g.m.2., y=meanID.npm2))+
   geom_point(size=2)+
   #geom_smooth(method="lm",color="black", linetype="dashed", level=.5,
@@ -122,6 +103,7 @@ FIbm<-ggplot(F.Talpha, aes(x=Average.of.STDM..g.m.2., y=meanID.npm2))+
   expand_limits(y=200)+theme_cowplot()+
   theme(axis.text.x = element_text(angle=30),
         axis.title.x=element_text(size=12)) #+geom_text_repel(aes(label=Reach), size=2)
+
 # from : https://stackoverflow.com/questions/35511951/r-ggplot2-collapse-or-remove-segment-of-y-axis-from-scatter-plot
 library(scales)
 squish_trans <- function(from, to, factor) {
@@ -167,7 +149,7 @@ EIbm<-ggplot(data=E.Talpha[E.Talpha$TreatA!="CTRL",],
                fun.args=list(mult=1))+
   stat_summary(data=E.Talpha[E.Talpha$TreatA=="CTRL",],
                aes(x=125, y=InvDensity.npm2),
-               fun.y=mean, geom="point")+
+               fun=mean, geom="point")+
   #geom_vline(xintercept=135, linetype="dashed",color="grey")+
   scale_y_log10(name="",#expression("Invertebrates # m "^-2),
                 breaks=c(1,500, 750, 1000,1500, 2000, 3000,4000))+
@@ -222,6 +204,7 @@ legendBM<-get_legend(EIbm+
                             legend.position = c(.5,.6),
                             legend.direction = "horizontal"))
 bmplots<-plot_grid(SIbmXX, EIbm, FIbm, nrow = 1, labels="AUTO")
+bmplots
 plot_grid(bmplots, legendBM, ncol=1, rel_heights = c(1,.2))
 ggsave("./Figures/MussAbundapt13.svg",width=9, height=3.75)
 
@@ -229,24 +212,27 @@ ggsave("./Figures/MussAbundapt13.svg",width=9, height=3.75)
 #Field - need to use a mixed model to account for space
 library(lme4);library(lmerTest)
 finv<-lmer(log10(meanID.npm2)~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
-anova(finv)
+summary(finv)
 hist(residuals(finv),col="darkgrey") #approximates normal
 plot(fitted(finv), residuals(finv))  #approximates heteroskodastity
 qqnorm(resid(finv));qqline(resid(finv))
 
 fric<-lmer(log(meanR)~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
-anova(fric)
+summary(fric)
 hist(residuals(fric),col="darkgrey") #approximates normal
 plot(fitted(fric), residuals(fric)) 
 qqnorm(resid(fric));qqline(resid(fric))
 mean(F.Talpha$meanR);sd(F.Talpha$meanR)
 
 fsim<-lmer(meanSimp~Average.of.STDM..g.m.2.+(1|HUC12), data=F.Talpha)
-anova(fsim)
+summary(fsim)
 hist(residuals(fsim),col="darkgrey") #approximates normal
 plot(fitted(fsim), residuals(fsim)) 
 qqnorm(resid(fsim));qqline(resid(fsim))
 mean(F.Talpha$meanSimp);sd(F.Talpha$meanSimp)
+
+hist(F.Talpha$Average.of.STDM..g.m.2.)
+hist(F.Talpha$)
 
 #Enclosure - same problem - how to account for that weird control treatment
 einv<-aov(log10(InvDensity.npm2)~TreatA, data=E.Talpha)

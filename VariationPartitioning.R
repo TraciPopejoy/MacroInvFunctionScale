@@ -1,64 +1,62 @@
 # Variation partitioning
-
-
-fallVar<-cca(field.com[,-c(7,13,22)]~
+fallVar<-cca(field.com~
                `Average of STDM (g.m-2)`+
                Benthic_CHLA_MG.M2+Discharge.cms+Dvar+
                HUC12num, data=field.env)
 fallVarR<-RsquareAdj(fallVar)$r.squared
 
-#Field Data
+#Field Data -----------
 showvarparts(3, bg=2:6)
-FVar<-varpart(field.com[,-c(7,13,22)], 
+FVar<-varpart(field.com, 
               ~`Average of STDM (g.m-2)`, 
               ~Benthic_CHLA_MG.M2+Discharge.cms+Dvar,
               ~HUC12num,
-              data=field.env, chisquare = T, 
+              data=field.env, 
               permutations=1000)
 FVar
 #fmusVar = a+f+d+g or a+al+ae+ael
-fmusVar<-cca(field.com[,-c(7,13,22)]~
+fmusVar<-cca(field.com~
                `Average of STDM (g.m-2)`, data=field.env)
 fmusVarR<-RsquareAdj(fmusVar)$r.squared
 #fenvVar = b+d+g+e or b+ae+el+ael
-fenvVar<-cca(field.com[,-c(7,13,22)]~
+fenvVar<-cca(field.com~
                Benthic_CHLA_MG.M2+Discharge.cms+Dvar, data=field.env)
 fenvVarR<-RsquareAdj(fenvVar)$r.squared
 #flocVar = c+f+g+e or l+al+el+ael
-flocVar<-cca(field.com[,-c(7,13,22)]~
+flocVar<-cca(field.com~
                HUC12num, data=field.env)
 flocVarR<-RsquareAdj(flocVar)$r.squared
 
 #fonlymus = a
-fonlymus<-cca(field.com[,-c(7,13,22)]~
+fonlymus<-cca(field.com~
                `Average of STDM (g.m-2)`+
                Condition(Benthic_CHLA_MG.M2+Discharge.cms+Dvar+
                HUC12num), data=field.env)
 RsquareAdj(fonlymus)
 #fonlyenv= b or e
-fonlyenv<-cca(field.com[,-c(7,13,22)]~
+fonlyenv<-cca(field.com~
                Condition(`Average of STDM (g.m-2)`+HUC12num)+
                Benthic_CHLA_MG.M2+Discharge.cms+Dvar, data=field.env)
 RsquareAdj(fonlyenv)
 #fonlyloc = c or l
-fonlyloc<-cca(field.com[,-c(7,13,22)]~
+fonlyloc<-cca(field.com~
                 Condition(`Average of STDM (g.m-2)`+
                 Benthic_CHLA_MG.M2+Discharge.cms+Dvar)+
                 HUC12num, data=field.env)
 RsquareAdj(fonlyloc)
 
 #fae.l = a+b+d or a+e+ae
-fae.l<-cca(field.com[,-c(7,13,22)]~
+fae.l<-cca(field.com~
              `Average of STDM (g.m-2)`+
              Benthic_CHLA_MG.M2+Discharge.cms+Dvar+
              Condition(HUC12num), data=field.env)
 #fal.e = a+c+f or a+l+al
-fal.e<-cca(field.com[,-c(7,13,22)]~
+fal.e<-cca(field.com~
              `Average of STDM (g.m-2)`+ HUC12num +
              Condition(Benthic_CHLA_MG.M2+Discharge.cms+Dvar),
            data=field.env)
 #fel.a = c+e+b or e+l+el
-fel.a<-cca(field.com[,-c(7,13,22)]~
+fel.a<-cca(field.com~
              Condition(`Average of STDM (g.m-2)`)+
              Benthic_CHLA_MG.M2+Discharge.cms+Dvar+
              HUC12num, data=field.env)
@@ -96,9 +94,12 @@ fvarr2<-c(c(Mussels=round(a*100,1),
         "Mussels&Location&Environment"=0))
 plot(venn(fvarr2), quantities=T)
 
-# Enclosures
-
-EVar
+# Enclosures -------
+EVar<-varpart(enc.com, ~ACT+AMB+Live, 
+              ~ChlAdensity+Discharge.cms+Dvar,
+              data=enc.env, 
+              chisquare=TRUE,
+              permutations=1000)
 eb<-EVar$part$fract$R.squared[1]+EVar$part$fract$R.squared[2]-
   EVar$part$fract$R.squared[3]
 ea<-EVar$part$fract$R.squared[1]-eb
@@ -114,7 +115,13 @@ even <- venneuler(c(Mussels=0.9, Environment=0.2,
                     "Mussels&Environment"=0.3))
 plot(even)
 
-SVar
+
+# Shell -------
+SVar<-varpart(shell.com, ~ShellSpecies+Type, 
+              ~ChlAdensity,
+              data=shell.env,
+              chisquare=TRUE,
+              permutations=1000)
 
 sb<-SVar$part$fract$R.squared[1]+SVar$part$fract$R.squared[2]-
   SVar$part$fract$R.squared[3]
